@@ -310,6 +310,264 @@ python pinns_heat_eq.py
 - 结构力学计算
 - 化学反应动力学
 
+## 进阶强化学习算法
+
+本项目实现了多种先进的强化学习算法，可通过前端页面切换对比：
+
+### 1. 安全强化学习 (Safe RL)
+
+**核心思想**：在标准 RL 基础上增加安全层，当系统接近安全边界时自动阻止危险动作。
+
+```python
+class SafeRLSimulator(BaseSimulator):
+    def get_action(self):
+        # 安全约束：接近边界时禁止危险动作
+        if self.current_temp <= self.temp_min + 1.0:
+            return 'heat' if temp_error < 0 else 'idle'
+        if self.current_temp >= self.temp_max - 1.0:
+            return 'cool' if temp_error > 0 else 'idle'
+```
+
+**特点**：双层架构保障系统安全，防止温度越界。
+
+### 2. 约束强化学习 (Constrained RL)
+
+**核心思想**：使用拉格朗日乘子法处理约束优化问题，在最大化奖励的同时确保约束满足。
+
+```python
+class ConstrainedRLSimulator(BaseSimulator):
+    def get_action(self):
+        distance_to_boundary = min(
+            self.current_temp - self.temp_min,
+            self.temp_max - self.current_temp
+        )
+        if distance_to_boundary < 2.0:
+            # 收紧控制策略以满足约束
+            ...
+```
+
+**典型算法**：CPO（约束策略优化）、TRPO 的约束版本。
+
+### 3. 基于模型的策略优化 (MBPO)
+
+**核心思想**：先学习环境动力学模型，再基于模型进行规划和策略优化。
+
+```python
+class MBPO_Simulator(BaseSimulator):
+    def predict_next_temp(self, temp, action):
+        # 学习到的动力学模型
+        delta = -0.1
+        if action == 'heat':
+            delta += 0.3
+        return max(self.temp_min, min(self.temp_max, temp + delta))
+    
+    def get_action(self):
+        # 基于模型进行多步规划
+        for action in ['heat', 'cool', 'idle']:
+            temp = self.current_temp
+            total_reward = 0
+            for _ in range(self.horizon):
+                temp = self.predict_next_temp(temp, action)
+                total_reward += reward
+```
+
+**优势**：数据效率高，适合样本获取成本高的场景。
+
+### 4. 层级强化学习 (Hierarchical RL)
+
+**核心思想**：将复杂任务分解为高层选项（Options）和低层动作。
+
+```python
+class HierarchicalRLSimulator(BaseSimulator):
+    def __init__(self):
+        self.current_goal = 'maintain'  # 高层目标
+    
+    def get_action(self):
+        # 高层策略：选择目标
+        if abs(temp_error) > 3.0:
+            self.current_goal = 'approach'
+        
+        # 低层策略：执行动作
+        if self.current_goal == 'approach':
+            return 'heat' if temp_error < 0 else 'cool'
+```
+
+**优势**：支持长期规划，可处理时序扩展问题。
+
+### 5. RL+MPC 混合控制
+
+**核心思想**：结合强化学习的学习能力和模型预测控制（MPC）的优化能力。
+
+```python
+class RLMPCSimulator(BaseSimulator):
+    def get_action(self):
+        rl_action = self.get_rl_action()      # RL 策略
+        mpc_action = self.get_mpc_action()    # MPC 优化
+        # 加权融合
+        if np.random.random() < self.rl_weight:
+            return rl_action
+        else:
+            return mpc_action
+```
+
+**优势**：兼顾学习能力和在线优化能力。
+
+## 独立演示 Demo
+
+本项目为每种进阶算法提供了独立的演示脚本，可以单独运行查看效果：
+
+### 1. 安全强化学习 Demo (`safe_rl_demo.py`)
+
+**技术路线**：
+```
+基础策略 → 安全层过滤 → 执行动作
+    ↓            ↓
+  选择动作    阻止危险动作
+```
+
+**工程过程**：
+1. 定义安全边界（20°C ~ 35°C）和安全裕度（2°C）
+2. 实现基础控制策略（基于误差的比例控制）
+3. 添加安全层：当温度接近边界时过滤危险动作
+4. 实现主动保护机制：距离边界1°C时强制反向动作
+
+**运行方式**：
+```bash
+python safe_rl_demo.py
+```
+
+**关键特性**：
+- 双层架构：基础策略 + 安全层
+- 安全裕度自适应调整
+- 安全干预记录和统计
+
+---
+
+### 2. 约束强化学习 Demo (`constrained_rl_demo.py`)
+
+**技术路线**：
+```
+目标优化 + 约束惩罚 → 拉格朗日乘子动态调整
+    ↓
+  最优动作选择
+```
+
+**工程过程**：
+1. 定义目标函数（温度接近目标）和约束函数（温度不越界）
+2. 初始化拉格朗日乘子（λ_lower, λ_upper）
+3. 综合代价 = 目标代价 + λ×约束违反
+4. 迭代优化：更新动作选择和乘子值
+
+**运行方式**：
+```bash
+python constrained_rl_demo.py
+```
+
+**关键特性**：
+- 拉格朗日乘子法约束优化
+- 乘子动态自适应调整
+- 约束违反惩罚机制
+- 乘子衰减防止过度保守
+
+---
+
+### 3. MBPO 基于模型的策略优化 Demo (`mbpo_demo.py`)
+
+**技术路线**：
+```
+学习动力学模型 → 多步前向模拟 → 选择最优动作
+     ↓
+  真实环境执行
+```
+
+**工程过程**：
+1. 构建动力学模型（温度变化预测）
+2. 实现模型预测函数（给定当前温度和动作，预测下一时刻温度）
+3. 基于模型进行多步规划（Horizon=5）
+4. 使用折扣奖励评估每个动作的长期影响
+5. 选择累积奖励最大的动作
+
+**运行方式**：
+```bash
+python mbpo_demo.py
+```
+
+**关键特性**：
+- 环境动力学模型学习
+- 多步前向规划（Rollout）
+- 折扣奖励值估计
+- 高数据效率
+
+---
+
+### 4. 层级强化学习 Demo (`hierarchical_rl_demo.py`)
+
+**技术路线**：
+```
+高层策略（选择选项）→ 低层策略（执行动作）
+     ↓                        ↓
+  approach/maintain      heat/cool/idle
+  /safe_guard
+```
+
+**工程过程**：
+1. 定义选项空间：approach（接近目标）、maintain（维持温度）、safe_guard（安全保护）
+2. 实现高层策略：根据状态选择合适的选项
+3. 实现低层策略：根据当前选项执行具体动作
+4. 实现选项终止机制：决定何时切换选项
+
+**运行方式**：
+```bash
+python hierarchical_rl_demo.py
+```
+
+**关键特性**：
+- 两层决策架构
+- 选项切换机制
+- 最小选项持续时间保证
+- 支持长期规划
+
+---
+
+### 5. RL+MPC 混合控制 Demo (`rl_mpc_hybrid_demo.py`)
+
+**技术路线**：
+```
+RL策略 ←─── 加权融合 ───→ MPC控制
+    ↓                        ↓
+  快速决策              精确优化
+```
+
+**工程过程**：
+1. 实现 RL 策略（学习到的近似最优策略）
+2. 实现 MPC 控制器（基于模型的在线优化）
+3. 设计融合机制（加权随机选择）
+4. 实现自适应权重：根据状态不确定性动态调整
+
+**运行方式**：
+```bash
+python rl_mpc_hybrid_demo.py
+```
+
+**关键特性**：
+- 双策略融合
+- 自适应权重调整
+- 兼顾学习能力和优化精度
+- 不确定性感知
+
+---
+
+## 算法对比
+
+| 算法 | 核心特点 | 适用场景 | Demo文件 |
+|------|----------|----------|----------|
+| **规则控制** | 基于阈值的简单策略 | 简单场景，无需训练 | `simple_demo.py` |
+| **安全 RL** | 双层安全架构 | 需要保证安全约束的场景 | `safe_rl_demo.py` |
+| **约束 RL** | 拉格朗日乘子优化 | 多约束优化问题 | `constrained_rl_demo.py` |
+| **MBPO** | 基于模型的规划 | 数据效率要求高 | `mbpo_demo.py` |
+| **层级 RL** | 分层任务分解 | 长期规划任务 | `hierarchical_rl_demo.py` |
+| **RL+MPC** | 混合控制策略 | 需要在线优化的场景 | `rl_mpc_hybrid_demo.py` |
+
 ## 项目扩展
 
 ### RL 温控扩展方向

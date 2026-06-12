@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>工业温控强化学习仿真</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            min-height: 100vh;
+            color: white;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        h1 {
+            font-size: 2.5rem;
+            background: linear-gradient(90deg, #00d4ff, #7b2fff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 10px;
+        }
+        
+        .subtitle {
+            color: #a0a0a0;
+            font-size: 1.1rem;
+        }
+        
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        
+        .card {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            padding: 24px;
+        }
+        
+        .card-title {
+            font-size: 1.3rem;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .temp-display {
+            text-align: center;
+            padding: 30px 0;
+        }
+        
+        .temp-value {
+            font-size: 5rem;
+            font-weight: bold;
+            color: #00d4ff;
+            text-shadow: 0 0 30px rgba(0, 212, 255, 0.5);
+        }
+        
+        .temp-unit {
+            font-size: 1.5rem;
+            color: #a0a0a0;
+        }
+        
+        .target-info {
+            margin-top: 15px;
+            color: #a0a0a0;
+        }
+        
+        .gauge-container {
+            position: relative;
+            width: 200px;
+            height: 200px;
+            margin: 0 auto;
+        }
+        
+        .gauge {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            background: conic-gradient(
+                #ff4757 0deg 45deg,
+                #ffa502 45deg 90deg,
+                #2ed573 90deg 135deg,
+                #ffa502 135deg 180deg,
+                #ff4757 180deg 180deg
+            );
+            mask: radial-gradient(farthest-side, transparent calc(100% - 20px), #fff calc(100% - 20px));
+            -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 20px), #fff calc(100% - 20px));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .gauge-center {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            background: #1a1a2e;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .gauge-needle {
+            position: absolute;
+            width: 4px;
+            height: 70px;
+            background: #00d4ff;
+            top: 15%;
+            left: 50%;
+            transform-origin: bottom center;
+            transform: translateX(-50%);
+            transition: transform 0.3s ease;
+            border-radius: 2px;
+        }
+        
+        .gauge-labels {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            top: 0;
+        }
+        
+        .gauge-label {
+            position: absolute;
+            font-size: 0.8rem;
+            color: #a0a0a0;
+        }
+        
+        .gauge-label.min { top: 60%; left: 5%; }
+        .gauge-label.max { top: 60%; right: 5%; }
+        .gauge-label.mid { top: 5%; left: 50%; transform: translateX(-50%); color: #2ed573; }
+        
+        .control-panel {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin-top: 20px;
+        }
+        
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 600;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(90deg, #00d4ff, #7b2fff);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(0, 212, 255, 0.4);
+        }
+        
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+        
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+        
+        .status-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-top: 20px;
+        }
+        
+        .status-item {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+        }
+        
+        .status-label {
+            color: #a0a0a0;
+            font-size: 0.9rem;
+            margin-bottom: 5px;
+        }
+        
+        .status-value {
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+        
+        .status-on {
+            color: #2ed573;
+        }
+        
+        .status-off {
+            color: #ff4757;
+        }
+        
+        .status-idle {
+            color: #ffa502;
+        }
+        
+        .chart-container {
+            height: 300px;
+            position: relative;
+        }
+        
+        .chart {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: flex-end;
+            gap: 2px;
+            padding: 10px;
+        }
+        
+        .chart-bar {
+            flex: 1;
+            background: linear-gradient(to top, #00d4ff, #7b2fff);
+            border-radius: 4px 4px 0 0;
+            transition: height 0.3s ease;
+            min-height: 5px;
+        }
+        
+        .chart-bar.target {
+            background: linear-gradient(to top, #2ed573, #7bed9f);
+        }
+        
+        .chart-labels {
+            display: flex;
+            justify-content: space-between;
+            padding: 0 10px;
+            font-size: 0.75rem;
+            color: #a0a0a0;
+            margin-top: 5px;
+        }
+        
+        .history-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        
+        .history-table th,
+        .history-table td {
+            padding: 8px;
+            text-align: center;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .history-table th {
+            color: #a0a0a0;
+            font-weight: 600;
+            font-size: 0.85rem;
+        }
+        
+        .history-table td {
+            font-size: 0.9rem;
+        }
+        
+        .action-heat { color: #ff4757; }
+        .action-cool { color: #00d4ff; }
+        .action-idle { color: #ffa502; }
+        
+        .progress-bar {
+            width: 100%;
+            height: 6px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 3px;
+            overflow: hidden;
+            margin-top: 10px;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #00d4ff, #7b2fff);
+            transition: width 0.3s ease;
+            border-radius: 3px;
+        }
+        
+        .stats-panel {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin-top: 20px;
+        }
+        
+        .stat-card {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+        }
+        
+        .stat-value {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #00d4ff;
+        }
+        
+        .stat-label {
+            font-size: 0.85rem;
+            color: #a0a0a0;
+            margin-top: 5px;
+        }
+        
+        @media (max-width: 768px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+            
+            h1 {
+                font-size: 1.8rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🔥 工业温控强化学习仿真</h1>
+            <p class="subtitle">基于 PPO 算法的自动温度控制系统</p>
+        </header>
+        
+        <div class="main-content">
+            <div class="card">
+                <h2 class="card-title">🌡️ 实时温度监控</h2>
+                
+                <div class="temp-display">
+                    <div class="gauge-container">
+                        <div class="gauge">
+                            <div class="gauge-center">
+                                <span class="temp-value" id="current-temp">25</span>
+                                <span class="temp-unit">°C</span>
+                            </div>
+                        </div>
+                        <div class="gauge-needle" id="gauge-needle"></div>
+                        <div class="gauge-labels">
+                            <span class="gauge-label min">20°C</span>
+                            <span class="gauge-label mid">25°C</span>
+                            <span class="gauge-label max">35°C</span>
+                        </div>
+                    </div>
+                    
+                    <div class="target-info">
+                        目标温度: <span style="color: #2ed573;">{{ target_temp }}°C</span>
+                    </div>
+                </div>
+                
+                <div class="status-grid">
+                    <div class="status-item">
+                        <div class="status-label">加热器</div>
+                        <div class="status-value" id="heater-status">OFF</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-label">冷却器</div>
+                        <div class="status-value" id="cooler-status">OFF</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-label">当前动作</div>
+                        <div class="status-value" id="action-status">IDLE</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-label">步数</div>
+                        <div class="status-value" id="step-count">0</div>
+                    </div>
+                </div>
+                
+                <div class="control-panel">
+                    <button class="btn btn-primary" onclick="startSimulation()">▶️ 开始仿真</button>
+                    <button class="btn btn-secondary" onclick="stepSimulation()">⏭️ 单步执行</button>
+                    <button class="btn btn-secondary" onclick="resetSimulation()">🔄 重置</button>
+                </div>
+                
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progress-fill" style="width: 0%"></div>
+                </div>
+            </div>
+            
+            <div class="card">
+                <h2 class="card-title">📈 温度变化曲线</h2>
+                
+                <div class="chart-container">
+                    <div class="chart" id="chart">
+                    </div>
+                </div>
+                <div class="chart-labels">
+                    <span>Step 1</span>
+                    <span>Step 50</span>
+                </div>
+                
+                <div class="stats-panel">
+                    <div class="stat-card">
+                        <div class="stat-value" id="avg-temp">--</div>
+                        <div class="stat-label">平均温度</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="max-temp">--</div>
+                        <div class="stat-label">最高温度</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="min-temp">--</div>
+                        <div class="stat-label">最低温度</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card" style="grid-column: span 2;">
+                <h2 class="card-title">📊 历史记录</h2>
+                <div style="max-height: 300px; overflow-y: auto;">
+                    <table class="history-table">
+                        <thead>
+                            <tr>
+                                <th>步数</th>
+                                <th>温度(°C)</th>
+                                <th>目标(°C)</th>
+                                <th>加热器</th>
+                                <th>冷却器</th>
+                                <th>动作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="history-body">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        const TEMP_MIN = 20;
+        const TEMP_MAX = 35;
+        const TARGET_TEMP = 25;
+        
+        let isRunning = false;
+        let intervalId = null;
+        let history = [];
+        
+        function updateGauge(temp) {
+            const percentage = ((temp - TEMP_MIN) / (TEMP_MAX - TEMP_MIN)) * 100;
+            const angle = -135 + (percentage * 2.7);
+            document.getElementById('gauge-needle').style.transform = `translateX(-50%) rotate(${angle}deg)`;
+        }
+        
+        function updateStatus(data) {
+            document.getElementById('current-temp').textContent = data.temp;
+            document.getElementById('step-count').textContent = data.step;
+            document.getElementById('heater-status').textContent = data.heater ? 'ON' : 'OFF';
+            document.getElementById('heater-status').className = 'status-value ' + (data.heater ? 'status-on' : 'status-off');
+            document.getElementById('cooler-status').textContent = data.cooler ? 'ON' : 'OFF';
+            document.getElementById('cooler-status').className = 'status-value ' + (data.cooler ? 'status-on' : 'status-off');
+            document.getElementById('action-status').textContent = data.action.toUpperCase();
+            document.getElementById('action-status').className = 'status-value action-' + data.action;
+            updateGauge(data.temp);
+        }
+        
+        function updateChart() {
+            const chart = document.getElementById('chart');
+            chart.innerHTML = '';
+            
+            history.forEach((item, index) => {
+                const bar = document.createElement('div');
+                bar.className = 'chart-bar';
+                const height = ((item.temp - TEMP_MIN) / (TEMP_MAX - TEMP_MIN)) * 100;
+                bar.style.height = `${Math.max(height, 2)}%`;
+                bar.title = `Step ${item.step}: ${item.temp}°C`;
+                chart.appendChild(bar);
+            });
+            
+            const targetBar = document.createElement('div');
+            targetBar.className = 'chart-bar target';
+            const targetHeight = ((TARGET_TEMP - TEMP_MIN) / (TEMP_MAX - TEMP_MIN)) * 100;
+            targetBar.style.height = `${targetHeight}%`;
+            targetBar.title = `Target: ${TARGET_TEMP}°C`;
+            chart.appendChild(targetBar);
+        }
+        
+        function updateHistory() {
+            const tbody = document.getElementById('history-body');
+            tbody.innerHTML = '';
+            
+            history.slice(-20).reverse().forEach(item => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${item.step}</td>
+                    <td>${item.temp}</td>
+                    <td>${item.target}</td>
+                    <td>${item.heater ? 'ON' : 'OFF'}</td>
+                    <td>${item.cooler ? 'ON' : 'OFF'}</td>
+                    <td class="action-${item.action}">${item.action.toUpperCase()}</td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+        
+        function updateStats() {
+            if (history.length === 0) return;
+            
+            const temps = history.map(h => h.temp);
+            document.getElementById('avg-temp').textContent = (temps.reduce((a, b) => a + b, 0) / temps.length).toFixed(2);
+            document.getElementById('max-temp').textContent = Math.max(...temps).toFixed(2);
+            document.getElementById('min-temp').textContent = Math.min(...temps).toFixed(2);
+        }
+        
+        async function stepSimulation() {
+            const response = await fetch('/api/step', { method: 'POST' });
+            const data = await response.json();
+            history.push(data);
+            updateStatus(data);
+            updateChart();
+            updateHistory();
+            updateStats();
+            
+            const progress = (history.length / 50) * 100;
+            document.getElementById('progress-fill').style.width = `${Math.min(progress, 100)}%`;
+        }
+        
+        async function resetSimulation() {
+            if (intervalId) {
+                clearInterval(intervalId);
+                intervalId = null;
+            }
+            isRunning = false;
+            
+            const response = await fetch('/api/reset', { method: 'POST' });
+            const data = await response.json();
+            
+            history = [];
+            updateStatus({ temp: data.initial_temp, step: 0, heater: false, cooler: false, action: 'idle' });
+            updateChart();
+            updateHistory();
+            updateStats();
+            document.getElementById('progress-fill').style.width = '0%';
+        }
+        
+        async function startSimulation() {
+            if (isRunning) return;
+            isRunning = true;
+            
+            while (isRunning && history.length < 50) {
+                await stepSimulation();
+                await new Promise(resolve => setTimeout(resolve, 300));
+            }
+            
+            isRunning = false;
+        }
+        
+        document.addEventListener('DOMContentLoaded', async () => {
+            await resetSimulation();
+        });
+    </script>
+</body>
+</html>

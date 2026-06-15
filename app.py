@@ -233,6 +233,31 @@ def index():
 def pinns():
     return render_template('pinns.html')
 
+# 安全强化学习页面
+@app.route('/safe-rl')
+def safe_rl():
+    return render_template('safe_rl.html')
+
+# 约束强化学习页面
+@app.route('/constrained-rl')
+def constrained_rl():
+    return render_template('constrained_rl.html')
+
+# MBPO页面
+@app.route('/mbpo')
+def mbpo():
+    return render_template('mbpo.html')
+
+# 层级强化学习页面
+@app.route('/hierarchical-rl')
+def hierarchical_rl():
+    return render_template('hierarchical_rl.html')
+
+# RL+MPC页面
+@app.route('/rl-mpc')
+def rl_mpc():
+    return render_template('rl_mpc.html')
+
 @app.route('/api/reset', methods=['POST'])
 def api_reset():
     global current_simulator
@@ -287,6 +312,211 @@ def api_simulate():
         })
     
     return jsonify({'status': 'success', 'history': history})
+
+# 安全强化学习 API
+@app.route('/api/safe-rl/reset', methods=['POST'])
+def api_safe_rl_reset():
+    sim = simulators['safe_rl']
+    initial_temp = sim.reset()
+    return jsonify({
+        'temperature': round(initial_temp, 2),
+        'target': sim.target_temp,
+        'action': 'idle',
+        'reward': 0,
+        'safety_margin': sim.safety_margin,
+        'in_danger_zone': False
+    })
+
+@app.route('/api/safe-rl/step', methods=['POST'])
+def api_safe_rl_step():
+    sim = simulators['safe_rl']
+    action = sim.get_action()
+    temp, _ = sim.apply_action(action)
+    
+    temp_error = abs(temp - sim.target_temp)
+    reward = 10.0 - temp_error * 2
+    
+    # Check if in danger zone
+    in_danger_zone = (temp <= sim.temp_min + sim.safety_margin or 
+                      temp >= sim.temp_max - sim.safety_margin)
+    
+    return jsonify({
+        'temperature': round(temp, 2),
+        'target': sim.target_temp,
+        'action': action,
+        'final_action': action,
+        'reward': round(reward, 2),
+        'safety_margin': sim.safety_margin,
+        'in_danger_zone': in_danger_zone
+    })
+
+# 约束强化学习 API
+@app.route('/api/constrained-rl/reset', methods=['POST'])
+def api_constrained_rl_reset():
+    sim = simulators['constrained_rl']
+    sim.reset()
+    return jsonify({
+        'temperature': round(sim.current_temp, 2),
+        'target': sim.target_temp,
+        'action': 'idle',
+        'reward': 0,
+        'constraint_weight': sim.constraint_weight,
+        'distance_to_boundary': round(min(sim.current_temp - sim.temp_min, sim.temp_max - sim.current_temp), 2)
+    })
+
+@app.route('/api/constrained-rl/step', methods=['POST'])
+def api_constrained_rl_step():
+    sim = simulators['constrained_rl']
+    action = sim.get_action()
+    temp, _ = sim.apply_action(action)
+    
+    temp_error = abs(temp - sim.target_temp)
+    reward = 10.0 - temp_error * 2
+    
+    distance_to_boundary = min(temp - sim.temp_min, sim.temp_max - temp)
+    violation = 1.0 if distance_to_boundary < 2.0 else 0.0
+    
+    return jsonify({
+        'temperature': round(temp, 2),
+        'target': sim.target_temp,
+        'action': action,
+        'reward': round(reward, 2),
+        'constraint_weight': sim.constraint_weight,
+        'distance_to_boundary': round(distance_to_boundary, 2),
+        'violation': violation
+    })
+
+# MBPO API
+@app.route('/api/mbpo/reset', methods=['POST'])
+def api_mbpo_reset():
+    sim = simulators['mbpo']
+    initial_temp = sim.reset()
+    
+    # Generate predictions for each action
+    predictions = {'heat': [], 'cool': [], 'idle': []}
+    for action in ['heat', 'cool', 'idle']:
+        temp = initial_temp
+        for _ in range(sim.horizon):
+            temp = sim.predict_next_temp(temp, action)
+            predictions[action].append(round(temp, 1))
+    
+    return jsonify({
+        'temperature': round(initial_temp, 2),
+        'target': sim.target_temp,
+        'action': 'idle',
+        'reward': 0,
+        'predicted_value': 0,
+        'predictions': predictions
+    })
+
+@app.route('/api/mbpo/step', methods=['POST'])
+def api_mbpo_step():
+    sim = simulators['mbpo']
+    action = sim.get_action()
+    temp, _ = sim.apply_action(action)
+    
+    temp_error = abs(temp - sim.target_temp)
+    reward = 10.0 - temp_error * 2
+    
+    # Generate predictions for each action
+    predictions = {'heat': [], 'cool': [], 'idle': []}
+    for act in ['heat', 'cool', 'idle']:
+        t = temp
+        for _ in range(sim.horizon):
+            t = sim.predict_next_temp(t, act)
+            predictions[act].append(round(t, 1))
+    
+    return jsonify({
+        'temperature': round(temp, 2),
+        'target': sim.target_temp,
+        'action': action,
+        'reward': round(reward, 2),
+        'predicted_value': round(reward * sim.horizon, 2),
+        'predictions': predictions
+    })
+
+# 层级强化学习 API
+@app.route('/api/hierarchical-rl/reset', methods=['POST'])
+def api_hierarchical_rl_reset():
+    sim = simulators['hierarchical_rl']
+    initial_temp = sim.reset()
+    sim.current_goal = 'maintain'
+    
+    return jsonify({
+        'temperature': round(initial_temp, 2),
+        'target': sim.target_temp,
+        'action': 'idle',
+        'option': sim.current_goal,
+        'reward': 0
+    })
+
+@app.route('/api/hierarchical-rl/step', methods=['POST'])
+def api_hierarchical_rl_step():
+    sim = simulators['hierarchical_rl']
+    action = sim.get_action()
+    temp, _ = sim.apply_action(action)
+    
+    temp_error = abs(temp - sim.target_temp)
+    reward = 10.0 - temp_error * 2
+    
+    return jsonify({
+        'temperature': round(temp, 2),
+        'target': sim.target_temp,
+        'action': action,
+        'option': sim.current_goal,
+        'reward': round(reward, 2)
+    })
+
+# RL+MPC API
+@app.route('/api/rl-mpc/reset', methods=['POST'])
+def api_rl_mpc_reset():
+    sim = simulators['rl_mpc']
+    initial_temp = sim.reset()
+    rl_action = sim.get_rl_action()
+    mpc_action = sim.get_mpc_action()
+    
+    temp_error = abs(initial_temp - sim.target_temp)
+    uncertainty = min(temp_error / 10.0, 1.0)
+    
+    return jsonify({
+        'temperature': round(initial_temp, 2),
+        'target': sim.target_temp,
+        'action': 'idle',
+        'rl_action': rl_action,
+        'mpc_action': mpc_action,
+        'final_action': 'idle',
+        'source': 'RL',
+        'rl_weight': sim.rl_weight,
+        'uncertainty': round(uncertainty, 3),
+        'reward': 0
+    })
+
+@app.route('/api/rl-mpc/step', methods=['POST'])
+def api_rl_mpc_step():
+    sim = simulators['rl_mpc']
+    action = sim.get_action()
+    temp, _ = sim.apply_action(action)
+    
+    rl_action = sim.get_rl_action()
+    mpc_action = sim.get_mpc_action()
+    source = 'RL' if action == rl_action else 'MPC'
+    
+    temp_error = abs(temp - sim.target_temp)
+    uncertainty = min(temp_error / 10.0, 1.0)
+    reward = 10.0 - temp_error * 2
+    
+    return jsonify({
+        'temperature': round(temp, 2),
+        'target': sim.target_temp,
+        'action': action,
+        'rl_action': rl_action,
+        'mpc_action': mpc_action,
+        'final_action': action,
+        'source': source,
+        'rl_weight': sim.rl_weight,
+        'uncertainty': round(uncertainty, 3),
+        'reward': round(reward, 2)
+    })
 
 @app.route('/api/pinns/train', methods=['POST'])
 def api_pinns_train():

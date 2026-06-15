@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>约束强化学习演示 - RLDemo</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        header {
+            background: white;
+            border-radius: 16px;
+            padding: 30px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            color: #2c3e50;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        
+        .subtitle {
+            color: #7f8c8d;
+            font-size: 1.1em;
+        }
+        
+        .nav-links {
+            margin-top: 20px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        
+        .nav-links a {
+            padding: 10px 20px;
+            background: #ecf0f1;
+            color: #2c3e50;
+            text-decoration: none;
+            border-radius: 8px;
+            transition: all 0.3s;
+            font-weight: 500;
+        }
+        
+        .nav-links a:hover {
+            background: #3498db;
+            color: white;
+            transform: translateY(-2px);
+        }
+        
+        .nav-links a.active {
+            background: #f5576c;
+            color: white;
+        }
+        
+        .content-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        
+        .card {
+            background: white;
+            border-radius: 16px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+        
+        .card h2 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-size: 1.5em;
+        }
+        
+        .chart-container {
+            position: relative;
+            height: 300px;
+            margin-top: 20px;
+        }
+        
+        .status-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            margin-top: 20px;
+        }
+        
+        .status-item {
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            text-align: center;
+        }
+        
+        .status-label {
+            font-size: 0.85em;
+            color: #7f8c8d;
+            margin-bottom: 5px;
+        }
+        
+        .status-value {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        
+        .status-value.warning {
+            color: #f39c12;
+        }
+        
+        .status-value.danger {
+            color: #e74c3c;
+        }
+        
+        .status-value.success {
+            color: #27ae60;
+        }
+        
+        .lambda-display {
+            margin-top: 20px;
+            padding: 20px;
+            background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
+            border-radius: 12px;
+        }
+        
+        .lambda-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            margin: 10px 0;
+            background: white;
+            border-radius: 8px;
+        }
+        
+        .lambda-label {
+            font-weight: 600;
+            color: #2c3e50;
+        }
+        
+        .lambda-value {
+            font-size: 1.3em;
+            font-weight: bold;
+            color: #9b59b6;
+        }
+        
+        .violation-display {
+            margin-top: 20px;
+        }
+        
+        .violation-bar {
+            margin: 15px 0;
+        }
+        
+        .violation-label {
+            font-size: 0.9em;
+            color: #7f8c8d;
+            margin-bottom: 5px;
+        }
+        
+        .violation-track {
+            height: 20px;
+            background: #ecf0f1;
+            border-radius: 10px;
+            overflow: hidden;
+            position: relative;
+        }
+        
+        .violation-fill {
+            height: 100%;
+            background: #e74c3c;
+            transition: width 0.3s;
+        }
+        
+        .violation-fill.success {
+            background: #27ae60;
+        }
+        
+        button {
+            padding: 12px 30px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-top: 20px;
+        }
+        
+        .btn-primary {
+            background: #3498db;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: #2980b9;
+            transform: translateY(-2px);
+        }
+        
+        .btn-success {
+            background: #27ae60;
+            color: white;
+        }
+        
+        .btn-success:hover {
+            background: #229954;
+            transform: translateY(-2px);
+        }
+        
+        .btn-danger {
+            background: #e74c3c;
+            color: white;
+        }
+        
+        .btn-danger:hover {
+            background: #c0392b;
+            transform: translateY(-2px);
+        }
+        
+        .controls {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        
+        .controls button {
+            flex: 1;
+            min-width: 120px;
+            margin-top: 0;
+        }
+        
+        .log-container {
+            max-height: 300px;
+            overflow-y: auto;
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 15px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+        }
+        
+        .log-entry {
+            padding: 8px;
+            margin: 5px 0;
+            border-radius: 4px;
+            border-left: 3px solid #9b59b6;
+            background: white;
+        }
+        
+        .log-entry.constraint {
+            border-left-color: #e74c3c;
+            background: #ffeaea;
+        }
+        
+        .log-entry.success {
+            border-left-color: #27ae60;
+            background: #eafff0;
+        }
+        
+        .metric-cards {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin-top: 20px;
+        }
+        
+        .metric-card {
+            padding: 20px;
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            border-radius: 12px;
+            color: white;
+            text-align: center;
+        }
+        
+        .metric-card h4 {
+            font-size: 0.9em;
+            margin-bottom: 10px;
+            opacity: 0.9;
+        }
+        
+        .metric-card .value {
+            font-size: 2em;
+            font-weight: bold;
+        }
+        
+        .algorithm-info {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 12px;
+            margin-top: 20px;
+        }
+        
+        .algorithm-info h3 {
+            margin-bottom: 15px;
+        }
+        
+        .algorithm-info ul {
+            list-style-position: inside;
+            line-height: 2;
+        }
+        
+        .full-width {
+            grid-column: 1 / -1;
+        }
+        
+        @media (max-width: 768px) {
+            .content-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .metric-cards {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>⚖️ 约束强化学习演示</h1>
+            <p class="subtitle">Constrained RL - 拉格朗日乘子法优化</p>
+            <div class="nav-links">
+                <a href="/">温控RL主页</a>
+                <a href="/pinns">PINNs演示</a>
+                <a href="/safe-rl">安全RL</a>
+                <a href="/constrained-rl" class="active">约束RL</a>
+                <a href="/mbpo">MBPO</a>
+                <a href="/hierarchical-rl">层级RL</a>
+                <a href="/rl-mpc">RL+MPC</a>
+            </div>
+        </header>
+        
+        <div class="content-grid">
+            <div class="card">
+                <h2>🌡️ 温度与约束状态</h2>
+                <div class="status-grid">
+                    <div class="status-item">
+                        <div class="status-label">当前温度</div>
+                        <div class="status-value" id="currentTemp">--°C</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-label">目标温度</div>
+                        <div class="status-value">25°C</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-label">温度误差</div>
+                        <div class="status-value" id="tempError">--°C</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-label">累计奖励</div>
+                        <div class="status-value success" id="totalReward">0</div>
+                    </div>
+                </div>
+                
+                <div class="lambda-display">
+                    <h3 style="margin-bottom: 15px; color: #2c3e50;">📊 拉格朗日乘子</h3>
+                    <div class="lambda-item">
+                        <span class="lambda-label">λ_lower (下限约束)</span>
+                        <span class="lambda-value" id="lambdaLower">0.1000</span>
+                    </div>
+                    <div class="lambda-item">
+                        <span class="lambda-label">λ_upper (上限约束)</span>
+                        <span class="lambda-value" id="lambdaUpper">0.1000</span>
+                    </div>
+                </div>
+                
+                <div class="violation-display">
+                    <h3 style="margin-bottom: 15px; color: #2c3e50;">⚠️ 约束违反情况</h3>
+                    <div class="violation-bar">
+                        <div class="violation-label">下限违反程度</div>
+                        <div class="violation-track">
+                            <div class="violation-fill" id="lowerViolation" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    <div class="violation-bar">
+                        <div class="violation-label">上限违反程度</div>
+                        <div class="violation-track">
+                            <div class="violation-fill" id="upperViolation" style="width: 0%"></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="controls">
+                    <button class="btn-success" onclick="startSimulation()">▶ 开始模拟</button>
+                    <button class="btn-danger" onclick="stopSimulation()">⏹ 停止</button>
+                    <button class="btn-primary" onclick="resetSimulation()">🔄 重置</button>
+                </div>
+            </div>
+            
+            <div class="card">
+                <h2>📊 统计信息</h2>
+                <div class="metric-cards">
+                    <div class="metric-card">
+                        <h4>步数</h4>
+                        <div class="value" id="stepCount">0</div>
+                    </div>
+                    <div class="metric-card">
+                        <h4>平均奖励</h4>
+                        <div class="value" id="avgReward">0</div>
+                    </div>
+                    <div class="metric-card">
+                        <h4>约束违反</h4>
+                        <div class="value" id="totalViolation">0</div>
+                    </div>
+                </div>
+                
+                <div class="chart-container">
+                    <canvas id="tempChart"></canvas>
+                </div>
+            </div>
+            
+            <div class="card">
+                <h2>📈 乘子动态调整</h2>
+                <div class="chart-container">
+                    <canvas id="lambdaChart"></canvas>
+                </div>
+            </div>
+            
+            <div class="card">
+                <h2>📝 运行日志</h2>
+                <div class="log-container" id="logContainer">
+                    <div class="log-entry">系统就绪，等待开始模拟...</div>
+                </div>
+            </div>
+            
+            <div class="card full-width">
+                <h2>🔧 技术原理说明</h2>
+                <div class="algorithm-info">
+                    <h3>拉格朗日乘子法优化</h3>
+                    <ul>
+                        <li><strong>目标函数</strong>：最大化累计奖励 J = Σrₜ</li>
+                        <li><strong>约束条件</strong>：确保温度在 [20°C, 35°C] 范围内</li>
+                        <li><strong>拉格朗日函数</strong>：L = J - λ × (约束违反程度)</li>
+                        <li><strong>乘子更新</strong>：λ_{t+1} = max(0, λ_t + α × violation_t)</li>
+                        <li><strong>动态调整</strong>：违反越严重，对应乘子越大，优化时更重视该约束</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        let isRunning = false;
+        let simulationInterval = null;
+        let stepCount = 0;
+        let totalReward = 0;
+        let totalViolation = 0;
+        let history = [];
+        let lambdaHistory = { lower: [], upper: [] };
+        
+        const TEMP_MIN = 20.0;
+        const TEMP_MAX = 35.0;
+        const TARGET_TEMP = 25.0;
+        
+        let tempChart, lambdaChart;
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            initCharts();
+            resetSimulation();
+        });
+        
+        function initCharts() {
+            const tempCtx = document.getElementById('tempChart').getContext('2d');
+            const lambdaCtx = document.getElementById('lambdaChart').getContext('2d');
+            
+            tempChart = new Chart(tempCtx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: '温度',
+                        data: [],
+                        borderColor: '#f5576c',
+                        backgroundColor: 'rgba(245, 87, 108, 0.1)',
+                        fill: true,
+                        tension: 0.4
+                    }, {
+                        label: '目标',
+                        data: [],
+                        borderColor: '#27ae60',
+                        borderDash: [5, 5],
+                        fill: false
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            min: 18,
+                            max: 37
+                        }
+                    }
+                }
+            });
+            
+            lambdaCtx = document.getElementById('lambdaChart').getContext('2d');
+            lambdaChart = new Chart(lambdaCtx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'λ_lower',
+                        data: [],
+                        borderColor: '#f39c12',
+                        fill: false
+                    }, {
+                        label: 'λ_upper',
+                        data: [],
+                        borderColor: '#9b59b6',
+                        fill: false
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false
+                }
+            });
+        }
+        
+        function updateDisplay(data) {
+            const temp = data.temperature;
+            const error = Math.abs(temp - TARGET_TEMP);
+            
+            document.getElementById('currentTemp').textContent = temp.toFixed(1) + '°C';
+            document.getElementById('tempError').textContent = error.toFixed(1) + '°C';
+            document.getElementById('lambdaLower').textContent = data.lambda_lower.toFixed(4);
+            document.getElementById('lambdaUpper').textContent = data.lambda_upper.toFixed(4);
+            document.getElementById('stepCount').textContent = stepCount;
+            document.getElementById('totalReward').textContent = totalReward.toFixed(1);
+            document.getElementById('avgReward').textContent = stepCount > 0 ? (totalReward / stepCount).toFixed(1) : '0';
+            document.getElementById('totalViolation').textContent = totalViolation.toFixed(2);
+            
+            // 更新违反程度
+            const lowerViolation = Math.max(0, TEMP_MIN - temp);
+            const upperViolation = Math.max(0, temp - TEMP_MAX);
+            
+            document.getElementById('lowerViolation').style.width = Math.min(100, lowerViolation * 20) + '%';
+            document.getElementById('upperViolation').style.width = Math.min(100, upperViolation * 20) + '%';
+            
+            document.getElementById('lowerViolation').className = 'violation-fill' + (lowerViolation > 0 ? '' : ' success');
+            document.getElementById('upperViolation').className = 'violation-fill' + (upperViolation > 0 ? '' : ' success');
+            
+            // 更新图表
+            history.push(temp);
+            if (history.length > 100) history.shift();
+            
+            lambdaHistory.lower.push(data.lambda_lower);
+            lambdaHistory.upper.push(data.lambda_upper);
+            if (lambdaHistory.lower.length > 100) {
+                lambdaHistory.lower.shift();
+                lambdaHistory.upper.shift();
+            }
+            
+            updateCharts();
+        }
+        
+        function updateCharts() {
+            tempChart.data.labels = history.map((_, i) => i.toString());
+            tempChart.data.datasets[0].data = history;
+            tempChart.data.datasets[1].data = history.map(() => TARGET_TEMP);
+            tempChart.update('none');
+            
+            lambdaChart.data.labels = lambdaHistory.lower.map((_, i) => i.toString());
+            lambdaChart.data.datasets[0].data = lambdaHistory.lower;
+            lambdaChart.data.datasets[1].data = lambdaHistory.upper;
+            lambdaChart.update('none');
+        }
+        
+        function addLog(message, type = 'normal') {
+            const container = document.getElementById('logContainer');
+            const entry = document.createElement('div');
+            entry.className = 'log-entry' + (type === 'constraint' ? ' constraint' : (type === 'success' ? ' success' : ''));
+            entry.textContent = message;
+            container.insertBefore(entry, container.firstChild);
+            
+            while (container.children.length > 20) {
+                container.removeChild(container.lastChild);
+            }
+        }
+        
+        async function simulationStep() {
+            try {
+                const response = await fetch('/api/constrained-rl/step', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'}
+                });
+                const data = await response.json();
+                
+                stepCount++;
+                totalReward += data.reward;
+                totalViolation += data.violation_lower + data.violation_upper;
+                
+                updateDisplay(data);
+                
+                if (data.violation_lower > 0 || data.violation_upper > 0) {
+                    addLog(`⚠️ 步骤${stepCount}: 约束违反 - λ更新`, 'constraint');
+                }
+            } catch (error) {
+                console.error('模拟错误:', error);
+                stopSimulation();
+            }
+        }
+        
+        function startSimulation() {
+            if (isRunning) return;
+            isRunning = true;
+            simulationInterval = setInterval(simulationStep, 1000);
+            addLog('开始模拟...', 'success');
+        }
+        
+        function stopSimulation() {
+            if (!isRunning) return;
+            isRunning = false;
+            if (simulationInterval) {
+                clearInterval(simulationInterval);
+                simulationInterval = null;
+            }
+            addLog('模拟已停止', 'normal');
+        }
+        
+        async function resetSimulation() {
+            stopSimulation();
+            stepCount = 0;
+            totalReward = 0;
+            totalViolation = 0;
+            history = [];
+            lambdaHistory = { lower: [], upper: [] };
+            
+            try {
+                const response = await fetch('/api/constrained-rl/reset', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'}
+                });
+                const data = await response.json();
+                updateDisplay(data);
+                addLog('系统已重置', 'success');
+            } catch (error) {
+                console.error('重置错误:', error);
+            }
+        }
+    </script>
+</body>
+</html>

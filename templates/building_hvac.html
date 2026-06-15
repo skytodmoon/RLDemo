@@ -1,0 +1,1159 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multi-Zone HVAC MAPPO - RLDemo</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #0f2027 0%, #203a43 50%, #2c5364 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: #e0e0e0;
+        }
+        .container { max-width: 1600px; margin: 0 auto; }
+
+        /* Header */
+        header {
+            background: rgba(255,255,255,0.07);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 16px;
+            padding: 25px 30px;
+            margin-bottom: 20px;
+        }
+        header h1 { color: #fff; font-size: 2em; margin-bottom: 8px; }
+        header h1 span { color: #4fc3f7; }
+        .subtitle { color: #90a4ae; font-size: 1em; margin-bottom: 15px; }
+        .nav-links { display: flex; gap: 8px; flex-wrap: wrap; }
+        .nav-links a {
+            padding: 8px 16px;
+            background: rgba(255,255,255,0.08);
+            color: #b0bec5;
+            text-decoration: none;
+            border-radius: 8px;
+            font-size: 0.85em;
+            transition: all 0.3s;
+        }
+        .nav-links a:hover { background: rgba(79,195,247,0.3); color: #fff; }
+        .nav-links a.active { background: #4fc3f7; color: #0f2027; font-weight: 600; }
+
+        /* Controls Bar */
+        .controls-bar {
+            background: rgba(255,255,255,0.07);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 12px;
+            padding: 20px 25px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+        .btn {
+            padding: 10px 24px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.95em;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+        .btn-start { background: #4caf50; color: #fff; }
+        .btn-start:hover { background: #66bb6a; }
+        .btn-stop { background: #f44336; color: #fff; }
+        .btn-stop:hover { background: #ef5350; }
+        .btn-reset { background: #ff9800; color: #fff; }
+        .btn-reset:hover { background: #ffa726; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .speed-control { display: flex; align-items: center; gap: 8px; color: #90a4ae; }
+        .speed-control input { width: 120px; }
+        .status-badge {
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: 600;
+        }
+        .status-running { background: rgba(76,175,80,0.2); color: #4caf50; }
+        .status-stopped { background: rgba(244,67,54,0.2); color: #f44336; }
+
+        /* Weather & Energy Bar */
+        .info-bar {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .info-card {
+            background: rgba(255,255,255,0.07);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 12px;
+            padding: 18px 20px;
+        }
+        .info-card h3 { color: #4fc3f7; font-size: 0.9em; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 1px; }
+        .info-card .value { font-size: 2em; font-weight: 700; color: #fff; }
+        .info-card .unit { font-size: 0.8em; color: #78909c; margin-left: 4px; }
+        .info-card .sub { font-size: 0.85em; color: #90a4ae; margin-top: 4px; }
+
+        /* Clock */
+        .clock-display {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .clock-icon { font-size: 2.5em; }
+        .clock-time { font-size: 1.8em; font-weight: 700; color: #fff; }
+        .clock-label { font-size: 0.85em; color: #90a4ae; }
+
+        /* Building Layout */
+        .building-section {
+            margin-bottom: 20px;
+        }
+        .building-section h2 {
+            color: #4fc3f7;
+            font-size: 1.2em;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .building-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            position: relative;
+        }
+
+        /* Zone Cards */
+        .zone-card {
+            background: rgba(255,255,255,0.07);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 14px;
+            padding: 20px;
+            transition: all 0.3s;
+            position: relative;
+            overflow: hidden;
+        }
+        .zone-card.comfort-good { border-left: 4px solid #4caf50; }
+        .zone-card.comfort-warn { border-left: 4px solid #ff9800; }
+        .zone-card.comfort-bad  { border-left: 4px solid #f44336; }
+        .zone-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        .zone-name { font-size: 1.2em; font-weight: 700; color: #fff; }
+        .zone-icon { font-size: 1.5em; }
+        .comfort-badge {
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.75em;
+            font-weight: 600;
+        }
+        .comfort-badge.good { background: rgba(76,175,80,0.2); color: #4caf50; }
+        .comfort-badge.warn { background: rgba(255,152,0,0.2); color: #ff9800; }
+        .comfort-badge.bad  { background: rgba(244,67,54,0.2); color: #f44336; }
+
+        .zone-metrics {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 15px;
+        }
+        .metric {
+            text-align: center;
+        }
+        .metric-label { font-size: 0.75em; color: #78909c; margin-bottom: 4px; }
+        .metric-value { font-size: 1.4em; font-weight: 700; color: #fff; }
+        .metric-target { font-size: 0.7em; color: #546e7a; }
+        .metric-bar {
+            height: 4px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 2px;
+            margin-top: 4px;
+            overflow: hidden;
+        }
+        .metric-bar-fill { height: 100%; border-radius: 2px; transition: width 0.5s; }
+
+        /* Equipment Status */
+        .equipment-row {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .equip-tag {
+            padding: 3px 10px;
+            border-radius: 6px;
+            font-size: 0.75em;
+            font-weight: 600;
+        }
+        .equip-tag.on { color: #fff; }
+        .equip-tag.off { background: rgba(255,255,255,0.05); color: #546e7a; }
+        .equip-heater.on { background: rgba(244,67,54,0.4); }
+        .equip-cooler.on { background: rgba(33,150,243,0.4); }
+        .equip-humid.on { background: rgba(0,188,212,0.4); }
+        .equip-dehumid.on { background: rgba(255,152,0,0.4); }
+
+        /* Coupling Visualization */
+        .coupling-section {
+            background: rgba(255,255,255,0.07);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .coupling-section h2 { color: #4fc3f7; font-size: 1.2em; margin-bottom: 15px; }
+        .coupling-canvas { width: 100%; height: 300px; }
+
+        /* Charts Grid */
+        .charts-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .chart-card {
+            background: rgba(255,255,255,0.07);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 12px;
+            padding: 20px;
+        }
+        .chart-card h3 { color: #b0bec5; font-size: 1em; margin-bottom: 10px; }
+        .chart-card canvas { width: 100% !important; max-height: 250px; }
+
+        /* RL Actions Display */
+        .rl-actions-section {
+            background: rgba(255,255,255,0.07);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .rl-actions-section h2 { color: #4fc3f7; font-size: 1.2em; margin-bottom: 15px; }
+        .rl-actions-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 12px;
+        }
+        .rl-zone-actions {
+            background: rgba(255,255,255,0.04);
+            border-radius: 10px;
+            padding: 14px;
+        }
+        .rl-zone-actions h4 { color: #fff; font-size: 0.9em; margin-bottom: 10px; }
+        .action-bar-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 6px;
+        }
+        .action-label { font-size: 0.7em; color: #78909c; width: 55px; }
+        .action-bar-bg {
+            flex: 1;
+            height: 8px;
+            background: rgba(255,255,255,0.08);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        .action-bar-val { height: 100%; border-radius: 4px; transition: width 0.5s; }
+        .action-bar-val.heat { background: #ef5350; }
+        .action-bar-val.cool { background: #42a5f5; }
+        .action-bar-val.humid { background: #26c6da; }
+        .action-bar-val.dehumid { background: #ffa726; }
+        .action-num { font-size: 0.7em; color: #90a4ae; width: 30px; text-align: right; }
+
+        /* Log */
+        .log-card {
+            background: rgba(255,255,255,0.07);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .log-card h3 { color: #b0bec5; font-size: 1em; margin-bottom: 10px; }
+        .log-container {
+            max-height: 200px;
+            overflow-y: auto;
+            font-family: 'SF Mono', 'Fira Code', monospace;
+            font-size: 0.8em;
+            line-height: 1.6;
+        }
+        .log-entry { padding: 3px 0; border-bottom: 1px solid rgba(255,255,255,0.03); }
+        .log-time { color: #546e7a; }
+        .log-action { color: #4fc3f7; }
+        .log-comfort { color: #4caf50; }
+        .log-warn { color: #ff9800; }
+
+        /* Architecture Section */
+        .arch-section {
+            background: rgba(255,255,255,0.07);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 12px;
+            padding: 25px;
+        }
+        .arch-section h2 { color: #4fc3f7; font-size: 1.3em; margin-bottom: 15px; }
+        .arch-section p { color: #90a4ae; line-height: 1.7; margin-bottom: 12px; }
+        .arch-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin-top: 15px;
+        }
+        .arch-card {
+            background: rgba(255,255,255,0.05);
+            border-radius: 10px;
+            padding: 18px;
+            border: 1px solid rgba(255,255,255,0.08);
+        }
+        .arch-card h4 { color: #4fc3f7; margin-bottom: 8px; }
+        .arch-card p { font-size: 0.85em; color: #78909c; }
+        .arch-card code {
+            display: block;
+            background: rgba(0,0,0,0.3);
+            border-radius: 6px;
+            padding: 10px;
+            margin-top: 8px;
+            font-size: 0.8em;
+            color: #80cbc4;
+            overflow-x: auto;
+        }
+
+        @media (max-width: 900px) {
+            .building-grid, .charts-grid, .rl-actions-grid { grid-template-columns: 1fr; }
+            .info-bar { grid-template-columns: 1fr; }
+            .arch-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <!-- Header -->
+    <header>
+        <h1>🏢 Multi-Zone HVAC <span>MAPPO</span> Demo</h1>
+        <p class="subtitle">多区域建筑能源管理 — 基于多智能体强化学习(MAPPO)的耦合温湿度控制系统</p>
+        <div class="nav-links">
+            <a href="/">📊 Dashboard</a>
+            <a href="/safe-rl">🛡️ Safe RL</a>
+            <a href="/constrained-rl">🔒 Constrained RL</a>
+            <a href="/mbpo">🧠 MBPO</a>
+            <a href="/hierarchical-rl">🏗️ Hierarchical RL</a>
+            <a href="/rl-mpc">⚙️ RL+MPC</a>
+            <a href="/pinns">🔬 PINNs</a>
+            <a href="/building-hvac" class="active">🏢 Building HVAC</a>
+        </div>
+    </header>
+
+    <!-- Controls -->
+    <div class="controls-bar">
+        <button class="btn btn-start" id="btnStart" onclick="startSimulation()">▶ Start</button>
+        <button class="btn btn-stop" id="btnStop" onclick="stopSimulation()" disabled>⏸ Stop</button>
+        <button class="btn btn-reset" onclick="resetSimulation()">↺ Reset</button>
+        <div class="speed-control">
+            <label>Speed:</label>
+            <input type="range" id="speedSlider" min="50" max="2000" value="500" step="50">
+            <span id="speedLabel">500ms</span>
+        </div>
+        <span class="status-badge status-stopped" id="statusBadge">● Stopped</span>
+        <span style="color:#546e7a;font-size:0.85em;">Step: <strong id="stepCount">0</strong></span>
+    </div>
+
+    <!-- Weather, Clock & Energy -->
+    <div class="info-bar">
+        <div class="info-card">
+            <h3>🌤️ Weather</h3>
+            <div class="value" id="outdoorTemp">--<span class="unit">°C</span></div>
+            <div class="sub">Solar: <span id="solarRad">--</span></div>
+        </div>
+        <div class="info-card">
+            <h3>🕐 Time of Day</h3>
+            <div class="clock-display">
+                <div class="clock-icon" id="clockIcon">🌅</div>
+                <div>
+                    <div class="clock-time" id="clockTime">08:00</div>
+                    <div class="clock-label" id="clockLabel">Morning</div>
+                </div>
+            </div>
+        </div>
+        <div class="info-card">
+            <h3>⚡ Energy Budget</h3>
+            <div class="value" id="energyPct">100<span class="unit">%</span></div>
+            <div class="sub"><span id="energyUsed">0</span> / <span id="energyBudget">1000</span> units</div>
+            <div class="metric-bar" style="margin-top:8px;height:6px;">
+                <div class="metric-bar-fill" id="energyBar" style="width:100%;background:linear-gradient(90deg,#4caf50,#8bc34a);"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Building Zones -->
+    <div class="building-section">
+        <h2>🏢 Building Zones</h2>
+        <div class="building-grid" id="zoneGrid">
+            <!-- Office -->
+            <div class="zone-card comfort-good" id="zone-Office">
+                <div class="zone-header">
+                    <div><span class="zone-icon">💼</span> <span class="zone-name">Office</span></div>
+                    <span class="comfort-badge good" id="comfort-Office">Comfortable</span>
+                </div>
+                <div class="zone-metrics">
+                    <div class="metric">
+                        <div class="metric-label">🌡️ Temperature</div>
+                        <div class="metric-value" id="temp-Office">--°C</div>
+                        <div class="metric-target">Target: 23°C ±2</div>
+                        <div class="metric-bar"><div class="metric-bar-fill" id="tempBar-Office" style="width:50%;background:#4caf50;"></div></div>
+                    </div>
+                    <div class="metric">
+                        <div class="metric-label">💧 Humidity</div>
+                        <div class="metric-value" id="humid-Office">--%</div>
+                        <div class="metric-target">Target: 45% ±10</div>
+                        <div class="metric-bar"><div class="metric-bar-fill" id="humidBar-Office" style="width:50%;background:#26c6da;"></div></div>
+                    </div>
+                    <div class="metric">
+                        <div class="metric-label">👥 Occupancy</div>
+                        <div class="metric-value" id="occ-Office">--</div>
+                        <div class="metric-target">People present</div>
+                        <div class="metric-bar"><div class="metric-bar-fill" id="occBar-Office" style="width:50%;background:#ab47bc;"></div></div>
+                    </div>
+                </div>
+                <div class="equipment-row" id="equip-Office">
+                    <span class="equip-tag equip-heater off">🔥 Heater</span>
+                    <span class="equip-tag equip-cooler off">❄️ Cooler</span>
+                    <span class="equip-tag equip-humid off">💦 Humidifier</span>
+                    <span class="equip-tag equip-dehumid off">🌬️ Dehumidifier</span>
+                </div>
+            </div>
+
+            <!-- Server Room -->
+            <div class="zone-card comfort-good" id="zone-Server">
+                <div class="zone-header">
+                    <div><span class="zone-icon">🖥️</span> <span class="zone-name">Server Room</span></div>
+                    <span class="comfort-badge good" id="comfort-Server">Comfortable</span>
+                </div>
+                <div class="zone-metrics">
+                    <div class="metric">
+                        <div class="metric-label">🌡️ Temperature</div>
+                        <div class="metric-value" id="temp-Server">--°C</div>
+                        <div class="metric-target">Target: 20°C ±1.5</div>
+                        <div class="metric-bar"><div class="metric-bar-fill" id="tempBar-Server" style="width:50%;background:#4caf50;"></div></div>
+                    </div>
+                    <div class="metric">
+                        <div class="metric-label">💧 Humidity</div>
+                        <div class="metric-value" id="humid-Server">--%</div>
+                        <div class="metric-target">Target: 40% ±15</div>
+                        <div class="metric-bar"><div class="metric-bar-fill" id="humidBar-Server" style="width:50%;background:#26c6da;"></div></div>
+                    </div>
+                    <div class="metric">
+                        <div class="metric-label">👥 Occupancy</div>
+                        <div class="metric-value" id="occ-Server">--</div>
+                        <div class="metric-target">Maintenance staff</div>
+                        <div class="metric-bar"><div class="metric-bar-fill" id="occBar-Server" style="width:50%;background:#ab47bc;"></div></div>
+                    </div>
+                </div>
+                <div class="equipment-row" id="equip-Server">
+                    <span class="equip-tag equip-heater off">🔥 Heater</span>
+                    <span class="equip-tag equip-cooler off">❄️ Cooler</span>
+                    <span class="equip-tag equip-humid off">💦 Humidifier</span>
+                    <span class="equip-tag equip-dehumid off">🌬️ Dehumidifier</span>
+                </div>
+            </div>
+
+            <!-- Lab -->
+            <div class="zone-card comfort-good" id="zone-Lab">
+                <div class="zone-header">
+                    <div><span class="zone-icon">🔬</span> <span class="zone-name">Laboratory</span></div>
+                    <span class="comfort-badge good" id="comfort-Lab">Comfortable</span>
+                </div>
+                <div class="zone-metrics">
+                    <div class="metric">
+                        <div class="metric-label">🌡️ Temperature</div>
+                        <div class="metric-value" id="temp-Lab">--°C</div>
+                        <div class="metric-target">Target: 22°C ±1.5</div>
+                        <div class="metric-bar"><div class="metric-bar-fill" id="tempBar-Lab" style="width:50%;background:#4caf50;"></div></div>
+                    </div>
+                    <div class="metric">
+                        <div class="metric-label">💧 Humidity</div>
+                        <div class="metric-value" id="humid-Lab">--%</div>
+                        <div class="metric-target">Target: 50% ±5 (Strict)</div>
+                        <div class="metric-bar"><div class="metric-bar-fill" id="humidBar-Lab" style="width:50%;background:#26c6da;"></div></div>
+                    </div>
+                    <div class="metric">
+                        <div class="metric-label">👥 Occupancy</div>
+                        <div class="metric-value" id="occ-Lab">--</div>
+                        <div class="metric-target">Lab personnel</div>
+                        <div class="metric-bar"><div class="metric-bar-fill" id="occBar-Lab" style="width:50%;background:#ab47bc;"></div></div>
+                    </div>
+                </div>
+                <div class="equipment-row" id="equip-Lab">
+                    <span class="equip-tag equip-heater off">🔥 Heater</span>
+                    <span class="equip-tag equip-cooler off">❄️ Cooler</span>
+                    <span class="equip-tag equip-humid off">💦 Humidifier</span>
+                    <span class="equip-tag equip-dehumid off">🌬️ Dehumidifier</span>
+                </div>
+            </div>
+
+            <!-- Conference -->
+            <div class="zone-card comfort-good" id="zone-Conference">
+                <div class="zone-header">
+                    <div><span class="zone-icon">📋</span> <span class="zone-name">Conference Room</span></div>
+                    <span class="comfort-badge good" id="comfort-Conference">Comfortable</span>
+                </div>
+                <div class="zone-metrics">
+                    <div class="metric">
+                        <div class="metric-label">🌡️ Temperature</div>
+                        <div class="metric-value" id="temp-Conference">--°C</div>
+                        <div class="metric-target">Target: 23°C ±2.5</div>
+                        <div class="metric-bar"><div class="metric-bar-fill" id="tempBar-Conference" style="width:50%;background:#4caf50;"></div></div>
+                    </div>
+                    <div class="metric">
+                        <div class="metric-label">💧 Humidity</div>
+                        <div class="metric-value" id="humid-Conference">--%</div>
+                        <div class="metric-target">Target: 45% ±12</div>
+                        <div class="metric-bar"><div class="metric-bar-fill" id="humidBar-Conference" style="width:50%;background:#26c6da;"></div></div>
+                    </div>
+                    <div class="metric">
+                        <div class="metric-label">👥 Occupancy</div>
+                        <div class="metric-value" id="occ-Conference">--</div>
+                        <div class="metric-target">Meeting attendees</div>
+                        <div class="metric-bar"><div class="metric-bar-fill" id="occBar-Conference" style="width:50%;background:#ab47bc;"></div></div>
+                    </div>
+                </div>
+                <div class="equipment-row" id="equip-Conference">
+                    <span class="equip-tag equip-heater off">🔥 Heater</span>
+                    <span class="equip-tag equip-cooler off">❄️ Cooler</span>
+                    <span class="equip-tag equip-humid off">💦 Humidifier</span>
+                    <span class="equip-tag equip-dehumid off">🌬️ Dehumidifier</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Thermal Coupling Canvas -->
+    <div class="coupling-section">
+        <h2>🔗 Thermal Coupling & Heat Flow</h2>
+        <canvas id="couplingCanvas" class="coupling-canvas"></canvas>
+    </div>
+
+    <!-- RL Actions -->
+    <div class="rl-actions-section">
+        <h2>🤖 MAPPO Agent Actions</h2>
+        <div class="rl-actions-grid" id="rlActionsGrid">
+            <div class="rl-zone-actions" id="rlActions-Office">
+                <h4>💼 Office</h4>
+                <div class="action-bar-row"><span class="action-label">Heat</span><div class="action-bar-bg"><div class="action-bar-val heat" style="width:0%"></div></div><span class="action-num">0</span></div>
+                <div class="action-bar-row"><span class="action-label">Cool</span><div class="action-bar-bg"><div class="action-bar-val cool" style="width:0%"></div></div><span class="action-num">0</span></div>
+                <div class="action-bar-row"><span class="action-label">Humid</span><div class="action-bar-bg"><div class="action-bar-val humid" style="width:0%"></div></div><span class="action-num">0</span></div>
+                <div class="action-bar-row"><span class="action-label">Dehumid</span><div class="action-bar-bg"><div class="action-bar-val dehumid" style="width:0%"></div></div><span class="action-num">0</span></div>
+            </div>
+            <div class="rl-zone-actions" id="rlActions-Server">
+                <h4>🖥️ Server</h4>
+                <div class="action-bar-row"><span class="action-label">Heat</span><div class="action-bar-bg"><div class="action-bar-val heat" style="width:0%"></div></div><span class="action-num">0</span></div>
+                <div class="action-bar-row"><span class="action-label">Cool</span><div class="action-bar-bg"><div class="action-bar-val cool" style="width:0%"></div></div><span class="action-num">0</span></div>
+                <div class="action-bar-row"><span class="action-label">Humid</span><div class="action-bar-bg"><div class="action-bar-val humid" style="width:0%"></div></div><span class="action-num">0</span></div>
+                <div class="action-bar-row"><span class="action-label">Dehumid</span><div class="action-bar-bg"><div class="action-bar-val dehumid" style="width:0%"></div></div><span class="action-num">0</span></div>
+            </div>
+            <div class="rl-zone-actions" id="rlActions-Lab">
+                <h4>🔬 Lab</h4>
+                <div class="action-bar-row"><span class="action-label">Heat</span><div class="action-bar-bg"><div class="action-bar-val heat" style="width:0%"></div></div><span class="action-num">0</span></div>
+                <div class="action-bar-row"><span class="action-label">Cool</span><div class="action-bar-bg"><div class="action-bar-val cool" style="width:0%"></div></div><span class="action-num">0</span></div>
+                <div class="action-bar-row"><span class="action-label">Humid</span><div class="action-bar-bg"><div class="action-bar-val humid" style="width:0%"></div></div><span class="action-num">0</span></div>
+                <div class="action-bar-row"><span class="action-label">Dehumid</span><div class="action-bar-bg"><div class="action-bar-val dehumid" style="width:0%"></div></div><span class="action-num">0</span></div>
+            </div>
+            <div class="rl-zone-actions" id="rlActions-Conference">
+                <h4>📋 Conference</h4>
+                <div class="action-bar-row"><span class="action-label">Heat</span><div class="action-bar-bg"><div class="action-bar-val heat" style="width:0%"></div></div><span class="action-num">0</span></div>
+                <div class="action-bar-row"><span class="action-label">Cool</span><div class="action-bar-bg"><div class="action-bar-val cool" style="width:0%"></div></div><span class="action-num">0</span></div>
+                <div class="action-bar-row"><span class="action-label">Humid</span><div class="action-bar-bg"><div class="action-bar-val humid" style="width:0%"></div></div><span class="action-num">0</span></div>
+                <div class="action-bar-row"><span class="action-label">Dehumid</span><div class="action-bar-bg"><div class="action-bar-val dehumid" style="width:0%"></div></div><span class="action-num">0</span></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts -->
+    <div class="charts-grid">
+        <div class="chart-card">
+            <h3>🌡️ Zone Temperatures</h3>
+            <canvas id="tempChart"></canvas>
+        </div>
+        <div class="chart-card">
+            <h3>💧 Zone Humidity</h3>
+            <canvas id="humidChart"></canvas>
+        </div>
+        <div class="chart-card">
+            <h3>⚡ Energy Consumption</h3>
+            <canvas id="energyChart"></canvas>
+        </div>
+        <div class="chart-card">
+            <h3>📊 Comfort Score</h3>
+            <canvas id="comfortChart"></canvas>
+        </div>
+    </div>
+
+    <!-- Decision Log -->
+    <div class="log-card">
+        <h3>📋 Decision Log</h3>
+        <div class="log-container" id="logContainer"></div>
+    </div>
+
+    <!-- Architecture -->
+    <div class="arch-section">
+        <h2>📐 Technical Architecture: Multi-Agent PPO for HVAC</h2>
+        <p>This demo implements a <strong>Centralized Training, Decentralized Execution (CTDE)</strong> paradigm for multi-zone building energy management. Each zone is controlled by an independent actor agent, while a shared centralized critic evaluates the global building state for stable value estimation.</p>
+        <div class="arch-grid">
+            <div class="arch-card">
+                <h4>🌍 Environment Dynamics</h4>
+                <p>4-zone building with coupled thermal dynamics. Zones exchange heat through walls (conductance matrix). External disturbances include outdoor temperature (day/night cycle), solar radiation, and occupancy schedules.</p>
+                <code>Zone state: [temp, humidity, occupancy]
+Coupling: conductance matrix (4×4)
+Disturbance: outdoor T, solar, occupancy</code>
+            </div>
+            <div class="arch-card">
+                <h4>🤖 MAPPO Algorithm</h4>
+                <p>Per-zone Beta-distribution actors output continuous HVAC actions. Centralized critic sees full 15-dim building state. GAE for advantage estimation, PPO clipped objective with entropy bonus.</p>
+                <code>Actor: π(a_i|o_i) ~ Beta(α, β)
+Critic: V(s_full) → scalar
+Clip: ε=0.2, γ=0.99, λ=0.95</code>
+            </div>
+            <div class="arch-card">
+                <h4>🎯 Multi-Objective Reward</h4>
+                <p>Comfort (temp + humidity) weighted by occupancy, energy cost penalty, and hard budget constraint. Server room prioritizes cooling, Lab prioritizes humidity control.</p>
+                <code>R = Σ comfort_i × occ_i
+   - 0.1 × energy_cost
+   - 1.0 × budget_violation</code>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// ============================================================
+// State & Configuration
+// ============================================================
+let isRunning = false;
+let timerId = null;
+let stepCount = 0;
+const MAX_HISTORY = 100;
+
+const ZONE_NAMES = ['Office', 'Server', 'Lab', 'Conference'];
+const ZONE_COLORS = {
+    Office: '#4fc3f7', Server: '#ef5350', Lab: '#66bb6a', Conference: '#ffa726'
+};
+const ZONE_ICONS = {
+    Office: '💼', Server: '🖥️', Lab: '🔬', Conference: '📋'
+};
+
+// History buffers
+const history = {
+    labels: [],
+    temp: { Office: [], Server: [], Lab: [], Conference: [] },
+    humid: { Office: [], Server: [], Lab: [], Conference: [] },
+    energy: [],
+    comfort: [],
+};
+
+// ============================================================
+// Charts
+// ============================================================
+function createMultiLineChart(canvasId, label, yLabel, datasets, suggestedMin, suggestedMax) {
+    const ctx = document.getElementById(canvasId).getContext('2d');
+    return new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: [],
+            datasets: datasets,
+        },
+        options: {
+            responsive: true,
+            animation: { duration: 300 },
+            plugins: { legend: { labels: { color: '#90a4ae', font: { size: 11 } } } },
+            scales: {
+                x: { display: true, ticks: { color: '#546e7a', maxTicksLimit: 10 }, grid: { color: 'rgba(255,255,255,0.04)' } },
+                y: { display: true, title: { display: true, text: yLabel, color: '#78909c' }, ticks: { color: '#546e7a' }, grid: { color: 'rgba(255,255,255,0.04)' }, suggestedMin, suggestedMax },
+            },
+        },
+    });
+}
+
+const tempChart = createMultiLineChart('tempChart', 'Temperature', '°C',
+    ZONE_NAMES.map(z => ({ label: z, data: [], borderColor: ZONE_COLORS[z], borderWidth: 2, pointRadius: 0, tension: 0.3 })), 16, 30);
+const humidChart = createMultiLineChart('humidChart', 'Humidity', '% RH',
+    ZONE_NAMES.map(z => ({ label: z, data: [], borderColor: ZONE_COLORS[z], borderWidth: 2, pointRadius: 0, tension: 0.3 })), 20, 70);
+
+const energyChart = new Chart(document.getElementById('energyChart').getContext('2d'), {
+    type: 'line',
+    data: {
+        labels: [],
+        datasets: [{
+            label: 'Energy Remaining (%)',
+            data: [],
+            borderColor: '#ffeb3b',
+            backgroundColor: 'rgba(255,235,59,0.1)',
+            fill: true,
+            borderWidth: 2,
+            pointRadius: 0,
+            tension: 0.3,
+        }],
+    },
+    options: {
+        responsive: true, animation: { duration: 300 },
+        plugins: { legend: { labels: { color: '#90a4ae' } } },
+        scales: {
+            x: { ticks: { color: '#546e7a', maxTicksLimit: 10 }, grid: { color: 'rgba(255,255,255,0.04)' } },
+            y: { min: 0, max: 100, title: { display: true, text: '%', color: '#78909c' }, ticks: { color: '#546e7a' }, grid: { color: 'rgba(255,255,255,0.04)' } },
+        },
+    },
+});
+
+const comfortChart = new Chart(document.getElementById('comfortChart').getContext('2d'), {
+    type: 'line',
+    data: {
+        labels: [],
+        datasets: [{
+            label: 'Avg Comfort Score',
+            data: [],
+            borderColor: '#4caf50',
+            backgroundColor: 'rgba(76,175,80,0.1)',
+            fill: true,
+            borderWidth: 2,
+            pointRadius: 0,
+            tension: 0.3,
+        }],
+    },
+    options: {
+        responsive: true, animation: { duration: 300 },
+        plugins: { legend: { labels: { color: '#90a4ae' } } },
+        scales: {
+            x: { ticks: { color: '#546e7a', maxTicksLimit: 10 }, grid: { color: 'rgba(255,255,255,0.04)' } },
+            y: { min: 0, max: 1, title: { display: true, text: 'Score', color: '#78909c' }, ticks: { color: '#546e7a' }, grid: { color: 'rgba(255,255,255,0.04)' } },
+        },
+    },
+});
+
+// ============================================================
+// Coupling Canvas Visualization
+// ============================================================
+const couplingCanvas = document.getElementById('couplingCanvas');
+const couplingCtx = couplingCanvas.getContext('2d');
+
+function resizeCouplingCanvas() {
+    couplingCanvas.width = couplingCanvas.offsetWidth;
+    couplingCanvas.height = couplingCanvas.offsetHeight;
+}
+resizeCouplingCanvas();
+window.addEventListener('resize', resizeCouplingCanvas);
+
+const zonePositions = {
+    Office:     { x: 0.25, y: 0.25 },
+    Server:     { x: 0.75, y: 0.25 },
+    Lab:        { x: 0.25, y: 0.75 },
+    Conference: { x: 0.75, y: 0.75 },
+};
+
+const couplingEdges = [
+    ['Office', 'Server', 0.8],
+    ['Office', 'Lab', 0.3],
+    ['Office', 'Conference', 0.6],
+    ['Server', 'Lab', 0.5],
+];
+
+let lastFlowData = {};
+
+function drawCoupling(flows) {
+    const w = couplingCanvas.width;
+    const h = couplingCanvas.height;
+    couplingCtx.clearRect(0, 0, w, h);
+
+    // Draw edges
+    for (const [a, b, weight] of couplingEdges) {
+        const pa = zonePositions[a];
+        const pb = zonePositions[b];
+        const ax = pa.x * w, ay = pa.y * h;
+        const bx = pb.x * w, by = pb.y * h;
+
+        const flowKey = `${a}-${b}`;
+        const flow = (flows && flows[flowKey]) || 0;
+        const flowStrength = Math.abs(flow) * 200;
+        const lineWidth = 1 + weight * 3;
+
+        // Color based on flow direction
+        let color;
+        if (flow > 0.001) {
+            color = `rgba(239,83,80,${Math.min(0.8, 0.2 + flowStrength)})`; // heat flowing from b to a
+        } else if (flow < -0.001) {
+            color = `rgba(66,165,245,${Math.min(0.8, 0.2 + flowStrength)})`; // heat flowing from a to b
+        } else {
+            color = 'rgba(255,255,255,0.1)';
+        }
+
+        couplingCtx.beginPath();
+        couplingCtx.moveTo(ax, ay);
+        couplingCtx.lineTo(bx, by);
+        couplingCtx.strokeStyle = color;
+        couplingCtx.lineWidth = lineWidth;
+        couplingCtx.stroke();
+
+        // Flow arrow
+        if (Math.abs(flow) > 0.001) {
+            const midX = (ax + bx) / 2;
+            const midY = (ay + by) / 2;
+            const angle = Math.atan2(by - ay, bx - ax);
+            const dir = flow > 0 ? 1 : -1;
+            const arrowLen = 8;
+            couplingCtx.beginPath();
+            couplingCtx.moveTo(midX, midY);
+            couplingCtx.lineTo(midX - dir * arrowLen * Math.cos(angle - 0.4), midY - dir * arrowLen * Math.sin(angle - 0.4));
+            couplingCtx.moveTo(midX, midY);
+            couplingCtx.lineTo(midX - dir * arrowLen * Math.cos(angle + 0.4), midY - dir * arrowLen * Math.sin(angle + 0.4));
+            couplingCtx.strokeStyle = color;
+            couplingCtx.lineWidth = 2;
+            couplingCtx.stroke();
+        }
+
+        // Weight label
+        const labelX = (ax + bx) / 2;
+        const labelY = (ay + by) / 2 - 10;
+        couplingCtx.font = '11px sans-serif';
+        couplingCtx.fillStyle = 'rgba(255,255,255,0.4)';
+        couplingCtx.textAlign = 'center';
+        couplingCtx.fillText(`k=${weight}`, labelX, labelY);
+    }
+
+    // Draw zone nodes
+    for (const name of ZONE_NAMES) {
+        const pos = zonePositions[name];
+        const cx = pos.x * w;
+        const cy = pos.y * h;
+        const radius = 35;
+
+        // Glow
+        const gradient = couplingCtx.createRadialGradient(cx, cy, 0, cx, cy, radius * 1.5);
+        gradient.addColorStop(0, ZONE_COLORS[name] + '40');
+        gradient.addColorStop(1, 'transparent');
+        couplingCtx.fillStyle = gradient;
+        couplingCtx.beginPath();
+        couplingCtx.arc(cx, cy, radius * 1.5, 0, Math.PI * 2);
+        couplingCtx.fill();
+
+        // Circle
+        couplingCtx.beginPath();
+        couplingCtx.arc(cx, cy, radius, 0, Math.PI * 2);
+        couplingCtx.fillStyle = ZONE_COLORS[name] + '30';
+        couplingCtx.fill();
+        couplingCtx.strokeStyle = ZONE_COLORS[name];
+        couplingCtx.lineWidth = 2;
+        couplingCtx.stroke();
+
+        // Label
+        couplingCtx.font = 'bold 13px sans-serif';
+        couplingCtx.fillStyle = '#fff';
+        couplingCtx.textAlign = 'center';
+        couplingCtx.textBaseline = 'middle';
+        couplingCtx.fillText(ZONE_ICONS[name], cx, cy - 6);
+        couplingCtx.font = '10px sans-serif';
+        couplingCtx.fillStyle = ZONE_COLORS[name];
+        couplingCtx.fillText(name, cx, cy + 10);
+    }
+}
+drawCoupling({});
+
+// ============================================================
+// UI Update Functions
+// ============================================================
+function updateZoneCard(name, data) {
+    // Temperature
+    const tempEl = document.getElementById(`temp-${name}`);
+    const tempBar = document.getElementById(`tempBar-${name}`);
+    const target = data.temp_target;
+    const tol = name === 'Server' ? 1.5 : name === 'Lab' ? 1.5 : name === 'Conference' ? 2.5 : 2.0;
+    const tempErr = Math.abs(data.temp - target);
+    tempEl.textContent = `${data.temp.toFixed(1)}°C`;
+    const tempPct = Math.max(0, Math.min(100, (1 - tempErr / 5) * 100));
+    tempBar.style.width = tempPct + '%';
+    tempBar.style.background = tempErr <= tol ? '#4caf50' : tempErr <= tol * 2 ? '#ff9800' : '#f44336';
+
+    // Humidity
+    const humidEl = document.getElementById(`humid-${name}`);
+    const humidBar = document.getElementById(`humidBar-${name}`);
+    const humidTarget = data.humid_target;
+    const humidTol = name === 'Lab' ? 5 : name === 'Server' ? 15 : name === 'Conference' ? 12 : 10;
+    const humidErr = Math.abs(data.humidity - humidTarget);
+    humidEl.textContent = `${data.humidity.toFixed(1)}%`;
+    const humidPct = Math.max(0, Math.min(100, (1 - humidErr / 20) * 100));
+    humidBar.style.width = humidPct + '%';
+    humidBar.style.background = humidErr <= humidTol ? '#26c6da' : humidErr <= humidTol * 2 ? '#ff9800' : '#f44336';
+
+    // Occupancy
+    const occEl = document.getElementById(`occ-${name}`);
+    const occBar = document.getElementById(`occBar-${name}`);
+    occEl.textContent = `${(data.occupancy * 100).toFixed(0)}%`;
+    occBar.style.width = (data.occupancy * 100) + '%';
+
+    // Comfort badge
+    const card = document.getElementById(`zone-${name}`);
+    const badge = document.getElementById(`comfort-${name}`);
+    if (data.in_comfort) {
+        card.className = 'zone-card comfort-good';
+        badge.className = 'comfort-badge good';
+        badge.textContent = '✓ Comfortable';
+    } else if (tempErr <= tol * 2 && humidErr <= humidTol * 2) {
+        card.className = 'zone-card comfort-warn';
+        badge.className = 'comfort-badge warn';
+        badge.textContent = '⚠ Marginal';
+    } else {
+        card.className = 'zone-card comfort-bad';
+        badge.className = 'comfort-badge bad';
+        badge.textContent = '✗ Uncomfortable';
+    }
+
+    // Equipment
+    const equipRow = document.getElementById(`equip-${name}`);
+    const tags = equipRow.querySelectorAll('.equip-tag');
+    const equipment = [
+        { key: 'heater', el: tags[0] },
+        { key: 'cooler', el: tags[1] },
+        { key: 'humidifier', el: tags[2] },
+        { key: 'dehumidifier', el: tags[3] },
+    ];
+    for (const eq of equipment) {
+        const val = data[eq.key] || 0;
+        if (val > 0.1) {
+            eq.el.className = `equip-tag equip-${eq.key === 'humidifier' ? 'humid' : eq.key === 'dehumidifier' ? 'dehumid' : eq.key} on`;
+            eq.el.style.opacity = 0.5 + val * 0.5;
+        } else {
+            eq.el.className = 'equip-tag equip-' + (eq.key === 'humidifier' ? 'humid' : eq.key === 'dehumidifier' ? 'dehumid' : eq.key) + ' off';
+            eq.el.style.opacity = 1;
+        }
+    }
+}
+
+function updateRLActions(rlActions) {
+    if (!rlActions) return;
+    const actionKeys = ['heater', 'cooler', 'humidifier', 'dehumidifier'];
+    const actionClasses = ['heat', 'cool', 'humid', 'dehumid'];
+
+    for (const name of ZONE_NAMES) {
+        const container = document.getElementById(`rlActions-${name}`);
+        if (!container) continue;
+        const actions = rlActions[name] || [0, 0, 0, 0];
+        const rows = container.querySelectorAll('.action-bar-row');
+        for (let i = 0; i < 4; i++) {
+            const val = actions[i] || 0;
+            const bar = rows[i].querySelector('.action-bar-val');
+            const num = rows[i].querySelector('.action-num');
+            bar.style.width = (val * 100) + '%';
+            num.textContent = val.toFixed(2);
+        }
+    }
+}
+
+function updateClock(hour) {
+    const h = Math.floor(hour);
+    const m = Math.floor((hour - h) * 60);
+    document.getElementById('clockTime').textContent = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+
+    let icon, label;
+    if (hour < 6) { icon = '🌙'; label = 'Night'; }
+    else if (hour < 9) { icon = '🌅'; label = 'Morning'; }
+    else if (hour < 12) { icon = '☀️'; label = 'Forenoon'; }
+    else if (hour < 14) { icon = '🌞'; label = 'Noon'; }
+    else if (hour < 18) { icon = '🌤️'; label = 'Afternoon'; }
+    else if (hour < 21) { icon = '🌇'; label = 'Evening'; }
+    else { icon = '🌙'; label = 'Night'; }
+    document.getElementById('clockIcon').textContent = icon;
+    document.getElementById('clockLabel').textContent = label;
+}
+
+function updateCharts() {
+    const labels = history.labels;
+
+    tempChart.data.labels = labels;
+    ZONE_NAMES.forEach((z, i) => { tempChart.data.datasets[i].data = history.temp[z]; });
+    tempChart.update('none');
+
+    humidChart.data.labels = labels;
+    ZONE_NAMES.forEach((z, i) => { humidChart.data.datasets[i].data = history.humid[z]; });
+    humidChart.update('none');
+
+    energyChart.data.labels = labels;
+    energyChart.data.datasets[0].data = history.energy;
+    energyChart.update('none');
+
+    comfortChart.data.labels = labels;
+    comfortChart.data.datasets[0].data = history.comfort;
+    comfortChart.update('none');
+}
+
+function addLog(message, type = 'info') {
+    const container = document.getElementById('logContainer');
+    const entry = document.createElement('div');
+    entry.className = 'log-entry';
+    const time = new Date().toLocaleTimeString();
+    const cls = type === 'comfort' ? 'log-comfort' : type === 'warn' ? 'log-warn' : type === 'action' ? 'log-action' : '';
+    entry.innerHTML = `<span class="log-time">[${time}]</span> <span class="${cls}">${message}</span>`;
+    container.prepend(entry);
+    while (container.children.length > 100) {
+        container.removeChild(container.lastChild);
+    }
+}
+
+// ============================================================
+// API Calls
+// ============================================================
+async function resetSimulation() {
+    stopSimulation();
+    try {
+        const resp = await fetch('/api/building-hvac/reset', { method: 'POST' });
+        const data = await resp.json();
+        stepCount = 0;
+        document.getElementById('stepCount').textContent = '0';
+
+        // Clear history
+        history.labels = [];
+        ZONE_NAMES.forEach(z => { history.temp[z] = []; history.humid[z] = []; });
+        history.energy = [];
+        history.comfort = [];
+
+        updateUI(data);
+        addLog('🔄 Simulation reset — all zones reinitialized', 'info');
+    } catch (e) {
+        addLog('❌ Reset failed: ' + e.message, 'warn');
+    }
+}
+
+async function simulationStep() {
+    try {
+        const resp = await fetch('/api/building-hvac/step', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({}),
+        });
+        const data = await resp.json();
+        stepCount++;
+        document.getElementById('stepCount').textContent = stepCount;
+        updateUI(data);
+
+        // Log significant events
+        if (stepCount % 12 === 0) { // Every hour
+            const comfortZones = ZONE_NAMES.filter(z => data.zones[z].in_comfort).length;
+            addLog(`⏰ Hour ${data.hour.toFixed(1)} — ${comfortZones}/4 zones comfortable, energy: ${data.energy_remaining_pct}%`, comfortZones >= 3 ? 'comfort' : 'warn');
+        }
+    } catch (e) {
+        addLog('❌ Step failed: ' + e.message, 'warn');
+        stopSimulation();
+    }
+}
+
+function updateUI(data) {
+    // Info bar
+    document.getElementById('outdoorTemp').innerHTML = `${data.outdoor_temp}<span class="unit">°C</span>`;
+    document.getElementById('solarRad').textContent = `${(data.solar_radiation * 100).toFixed(0)}%`;
+    updateClock(data.hour);
+
+    document.getElementById('energyPct').innerHTML = `${data.energy_remaining_pct}<span class="unit">%</span>`;
+    document.getElementById('energyUsed').textContent = data.energy_used;
+    document.getElementById('energyBudget').textContent = data.energy_budget;
+    const energyBar = document.getElementById('energyBar');
+    energyBar.style.width = data.energy_remaining_pct + '%';
+    energyBar.style.background = data.energy_remaining_pct > 50 ?
+        'linear-gradient(90deg,#4caf50,#8bc34a)' :
+        data.energy_remaining_pct > 20 ?
+        'linear-gradient(90deg,#ff9800,#ffc107)' :
+        'linear-gradient(90deg,#f44336,#ef5350)';
+
+    // Zones
+    for (const name of ZONE_NAMES) {
+        updateZoneCard(name, data.zones[name]);
+    }
+
+    // RL Actions
+    updateRLActions(data.rl_actions);
+
+    // Coupling
+    drawCoupling(data.coupling_flows);
+    lastFlowData = data.coupling_flows || {};
+
+    // History
+    const label = `S${stepCount}`;
+    history.labels.push(label);
+    if (history.labels.length > MAX_HISTORY) history.labels.shift();
+
+    for (const name of ZONE_NAMES) {
+        history.temp[name].push(data.zones[name].temp);
+        history.humid[name].push(data.zones[name].humidity);
+        if (history.temp[name].length > MAX_HISTORY) history.temp[name].shift();
+        if (history.humid[name].length > MAX_HISTORY) history.humid[name].shift();
+    }
+
+    history.energy.push(data.energy_remaining_pct);
+    if (history.energy.length > MAX_HISTORY) history.energy.shift();
+
+    // Comfort score
+    let totalComfort = 0;
+    let count = 0;
+    for (const name of ZONE_NAMES) {
+        const z = data.zones[name];
+        const c = data.comfort_info?.zone_details?.[name];
+        if (c) {
+            totalComfort += c.comfort;
+            count++;
+        }
+    }
+    history.comfort.push(count > 0 ? totalComfort / count : 0.5);
+    if (history.comfort.length > MAX_HISTORY) history.comfort.shift();
+
+    updateCharts();
+}
+
+// ============================================================
+// Simulation Control
+// ============================================================
+function startSimulation() {
+    if (isRunning) return;
+    isRunning = true;
+    document.getElementById('btnStart').disabled = true;
+    document.getElementById('btnStop').disabled = false;
+    document.getElementById('statusBadge').className = 'status-badge status-running';
+    document.getElementById('statusBadge').textContent = '● Running';
+    addLog('▶ Simulation started — MAPPO agent controlling HVAC', 'action');
+    runLoop();
+}
+
+function stopSimulation() {
+    isRunning = false;
+    if (timerId) { clearTimeout(timerId); timerId = null; }
+    document.getElementById('btnStart').disabled = false;
+    document.getElementById('btnStop').disabled = true;
+    document.getElementById('statusBadge').className = 'status-badge status-stopped';
+    document.getElementById('statusBadge').textContent = '● Stopped';
+}
+
+function runLoop() {
+    if (!isRunning) return;
+    const speed = parseInt(document.getElementById('speedSlider').value);
+    simulationStep().then(() => {
+        timerId = setTimeout(runLoop, speed);
+    });
+}
+
+// Speed slider
+document.getElementById('speedSlider').addEventListener('input', function() {
+    document.getElementById('speedLabel').textContent = this.value + 'ms';
+});
+
+// ============================================================
+// Init
+// ============================================================
+resetSimulation();
+</script>
+</body>
+</html>

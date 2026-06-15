@@ -43,9 +43,9 @@ class BaseSimulator:
 class RuleBasedSimulator(BaseSimulator):
     def get_action(self):
         temp_error = self.current_temp - self.target_temp
-        if temp_error < -1.0:
+        if temp_error < -0.5:
             return 'heat'
-        elif temp_error > 1.0:
+        elif temp_error > 0.5:
             return 'cool'
         else:
             return 'idle'
@@ -63,9 +63,9 @@ class SafeRLSimulator(BaseSimulator):
         if self.current_temp >= self.temp_max - 1.0:
             return 'cool' if temp_error > 0 else 'idle'
         
-        if temp_error < -1.0:
+        if temp_error < -0.5:
             return 'heat'
-        elif temp_error > 1.0:
+        elif temp_error > 0.5:
             return 'cool'
         else:
             return 'idle'
@@ -88,9 +88,9 @@ class ConstrainedRLSimulator(BaseSimulator):
             else:
                 return 'cool' if distance_to_boundary > 1.0 else 'idle'
         
-        if temp_error < -1.0:
+        if temp_error < -0.5:
             return 'heat'
-        elif temp_error > 1.0:
+        elif temp_error > 0.5:
             return 'cool'
         else:
             return 'idle'
@@ -164,9 +164,9 @@ class RLMPCSimulator(BaseSimulator):
     
     def get_rl_action(self):
         temp_error = self.current_temp - self.target_temp
-        if temp_error < -1.0:
+        if temp_error < -0.5:
             return 'heat'
-        elif temp_error > 1.0:
+        elif temp_error > 0.5:
             return 'cool'
         else:
             return 'idle'
@@ -206,6 +206,238 @@ class RLMPCSimulator(BaseSimulator):
         else:
             return mpc_action
 
+class BuildingHVACSimulator:
+    """Multi-zone HVAC building simulator for web demo."""
+
+    ZONE_NAMES = ["Office", "Server", "Lab", "Conference"]
+    COMFORT = {
+        "Office":     {"temp": 23.0, "temp_tol": 2.0, "humid": 45.0, "humid_tol": 10.0},
+        "Server":     {"temp": 20.0, "temp_tol": 1.5, "humid": 40.0, "humid_tol": 15.0},
+        "Lab":        {"temp": 22.0, "temp_tol": 1.5, "humid": 50.0, "humid_tol": 5.0},
+        "Conference": {"temp": 23.0, "temp_tol": 2.5, "humid": 45.0, "humid_tol": 12.0},
+    }
+    ZONE_PROPS = {
+        "Office":     {"heat_gen": 0.0,  "cap_heat": 2.0, "cap_cool": 2.0, "cap_humid": 1.5, "cap_dehumid": 1.5},
+        "Server":     {"heat_gen": 3.0,  "cap_heat": 1.0, "cap_cool": 3.0, "cap_humid": 1.0, "cap_dehumid": 2.0},
+        "Lab":        {"heat_gen": 0.5,  "cap_heat": 2.0, "cap_cool": 2.0, "cap_humid": 3.0, "cap_dehumid": 3.0},
+        "Conference": {"heat_gen": 0.0,  "cap_heat": 2.5, "cap_cool": 2.5, "cap_humid": 1.5, "cap_dehumid": 1.5},
+    }
+    COUPLING = np.array([
+        [0.0, 0.8, 0.3, 0.6],
+        [0.8, 0.0, 0.5, 0.1],
+        [0.3, 0.5, 0.0, 0.1],
+        [0.6, 0.1, 0.1, 0.0],
+    ])
+    OCC_SCHEDULES = {
+        "Office":     lambda h: 0.8 if 8 <= h <= 18 else (0.3 if 6 <= h <= 20 else 0.05),
+        "Server":     lambda h: 0.2 if 0 <= h <= 6 else 0.3,
+        "Lab":        lambda h: 0.7 if 9 <= h <= 17 else (0.2 if 7 <= h <= 19 else 0.0),
+        "Conference": lambda h: 0.9 if (9 <= h <= 11 or 14 <= h <= 16) else (0.3 if 8 <= h <= 18 else 0.0),
+    }
+
+    def __init__(self):
+        self.reset()
+
+    def reset(self):
+        self.step_count = 0
+        self.hour_of_day = 8.0
+        self.energy_used = 0.0
+        self.energy_budget = 1000.0
+        self.zones = {}
+        for name in self.ZONE_NAMES:
+            comfort = self.COMFORT[name]
+            self.zones[name] = {
+                "temp": np.random.uniform(comfort["temp"] - 2, comfort["temp"] + 2),
+                "humidity": np.random.uniform(comfort["humid"] - 5, comfort["humid"] + 5),
+                "occupancy": self._get_occupancy(name),
+                "heater": 0.0, "cooler": 0.0,
+                "humidifier": 0.0, "dehumidifier": 0.0,
+            }
+        return self._get_state()
+
+    def _get_occupancy(self, name):
+        base = self.OCC_SCHEDULES[name](self.hour_of_day)
+        return np.clip(base + np.random.normal(0, 0.05), 0.0, 1.0)
+
+    def _get_outdoor_temp(self):
+        return 15.0 + 10.0 * np.sin(2 * np.pi * (self.hour_of_day - 6.0) / 24.0)
+
+    def _get_solar_radiation(self):
+        if self.hour_of_day < 6 or self.hour_of_day > 20:
+            return 0.0
+        return max(0.0, np.sin(np.pi * (self.hour_of_day - 6.0) / 14.0))
+
+    def step(self, actions):
+        """actions: dict of {zone_name: [heater, cooler, humidifier, dehumidifier]}"""
+        for name in self.ZONE_NAMES:
+            z = self.zones[name]
+            act = actions.get(name, [0, 0, 0, 0])
+            z["heater"] = float(np.clip(act[0], 0, 1))
+            z["cooler"] = float(np.clip(act[1], 0, 1))
+            z["humidifier"] = float(np.clip(act[2], 0, 1))
+            z["dehumidifier"] = float(np.clip(act[3], 0, 1))
+
+        # Energy cost
+        energy_step = 0
+        for name in self.ZONE_NAMES:
+            z = self.zones[name]
+            p = self.ZONE_PROPS[name]
+            energy_step += (z["heater"] * p["cap_heat"] * 0.5 +
+                            z["cooler"] * p["cap_cool"] * 0.8 +
+                            z["humidifier"] * p["cap_humid"] * 0.2 +
+                            z["dehumidifier"] * p["cap_dehumid"] * 0.3)
+        self.energy_used += energy_step
+
+        # Temperature dynamics
+        outdoor_t = self._get_outdoor_temp()
+        solar = self._get_solar_radiation()
+        new_temps = {}
+        for i, name in enumerate(self.ZONE_NAMES):
+            z = self.zones[name]
+            p = self.ZONE_PROPS[name]
+            hvac_heat = (z["heater"] * p["cap_heat"] - z["cooler"] * p["cap_cool"]) * 0.3
+            internal_heat = (p["heat_gen"] + z["occupancy"] * 1.0) * 0.02
+            solar_gain = solar * 0.5 * (0.3 if name == "Office" else 0.1)
+            outdoor_loss = (z["temp"] - outdoor_t) * 0.01
+            coupling_heat = 0
+            for j, other_name in enumerate(self.ZONE_NAMES):
+                if i != j:
+                    coupling_heat += (self.zones[other_name]["temp"] - z["temp"]) * self.COUPLING[i, j] * 0.005
+            new_temps[name] = z["temp"] + hvac_heat + internal_heat + solar_gain - outdoor_loss + coupling_heat
+
+        for name in self.ZONE_NAMES:
+            self.zones[name]["temp"] = np.clip(new_temps[name], 10.0, 40.0)
+
+        # Humidity dynamics
+        for name in self.ZONE_NAMES:
+            z = self.zones[name]
+            p = self.ZONE_PROPS[name]
+            humid_change = (z["humidifier"] * p["cap_humid"] - z["dehumidifier"] * p["cap_dehumid"]) * 0.5
+            occupant_humid = z["occupancy"] * 0.05
+            outdoor_humid = 50.0 + 10.0 * np.sin(2 * np.pi * self.hour_of_day / 24.0)
+            humid_drift = (outdoor_humid - z["humidity"]) * 0.002
+            z["humidity"] = np.clip(z["humidity"] + humid_change + occupant_humid + humid_drift, 10.0, 90.0)
+
+        # Occupancy
+        for name in self.ZONE_NAMES:
+            self.zones[name]["occupancy"] = self._get_occupancy(name)
+
+        self.step_count += 1
+        self.hour_of_day = (self.hour_of_day + 5.0 / 60.0) % 24.0
+
+        # Reward
+        reward, comfort_info = self._compute_reward()
+        return self._get_state(), reward, comfort_info
+
+    def _compute_reward(self):
+        total_comfort = 0
+        zone_details = {}
+        for name in self.ZONE_NAMES:
+            z = self.zones[name]
+            c = self.COMFORT[name]
+            temp_err = abs(z["temp"] - c["temp"])
+            humid_err = abs(z["humidity"] - c["humid"])
+            in_temp = temp_err <= c["temp_tol"]
+            in_humid = humid_err <= c["humid_tol"]
+            temp_r = max(0, 1.0 - temp_err * 0.3) if in_temp else max(0, 0.7 - (temp_err - c["temp_tol"]) * 0.5)
+            humid_r = max(0, 1.0 - humid_err * 0.1) if in_humid else max(0, 0.8 - (humid_err - c["humid_tol"]) * 0.3)
+            comfort = (temp_r * 0.7 + humid_r * 0.3) * (0.3 + 0.7 * z["occupancy"])
+            total_comfort += comfort
+            zone_details[name] = {
+                "temp_reward": round(temp_r, 3), "humid_reward": round(humid_r, 3),
+                "comfort": round(comfort, 3), "in_comfort": bool(in_temp and in_humid),
+            }
+        comfort_reward = (total_comfort / 4) * 2.0 - 1.0
+        energy_penalty = -0.1 * self._compute_energy_step()
+        budget_penalty = -1.0 if self.energy_used >= self.energy_budget else 0.0
+        reward = comfort_reward + energy_penalty + budget_penalty
+        return reward, {
+            "comfort_reward": round(comfort_reward, 3),
+            "energy_penalty": round(energy_penalty, 3),
+            "total_reward": round(reward, 3),
+            "zone_details": zone_details,
+        }
+
+    def _compute_energy_step(self):
+        total = 0
+        for name in self.ZONE_NAMES:
+            z = self.zones[name]
+            p = self.ZONE_PROPS[name]
+            total += (z["heater"] * p["cap_heat"] * 0.5 +
+                      z["cooler"] * p["cap_cool"] * 0.8 +
+                      z["humidifier"] * p["cap_humid"] * 0.2 +
+                      z["dehumidifier"] * p["cap_dehumid"] * 0.3)
+        return total
+
+    def _get_state(self):
+        zone_info = {}
+        for name in self.ZONE_NAMES:
+            z = self.zones[name]
+            c = self.COMFORT[name]
+            zone_info[name] = {
+                "temp": round(z["temp"], 2),
+                "humidity": round(z["humidity"], 2),
+                "occupancy": round(z["occupancy"], 2),
+                "temp_target": c["temp"],
+                "humid_target": c["humid"],
+                "heater": round(z["heater"], 2),
+                "cooler": round(z["cooler"], 2),
+                "humidifier": round(z["humidifier"], 2),
+                "dehumidifier": round(z["dehumidifier"], 2),
+                "in_comfort": bool(abs(z["temp"] - c["temp"]) <= c["temp_tol"] and
+                                   abs(z["humidity"] - c["humid"]) <= c["humid_tol"]),
+            }
+        # Coupling heat flows
+        flows = {}
+        for i, ni in enumerate(self.ZONE_NAMES):
+            for j, nj in enumerate(self.ZONE_NAMES):
+                if i < j and self.COUPLING[i, j] > 0:
+                    flow = (self.zones[nj]["temp"] - self.zones[ni]["temp"]) * self.COUPLING[i, j] * 0.005
+                    flows[f"{ni}-{nj}"] = round(flow, 4)
+
+        return {
+            "step": self.step_count,
+            "hour": round(self.hour_of_day, 2),
+            "outdoor_temp": round(self._get_outdoor_temp(), 2),
+            "solar_radiation": round(self._get_solar_radiation(), 3),
+            "zones": zone_info,
+            "coupling_flows": flows,
+            "energy_used": round(self.energy_used, 1),
+            "energy_budget": self.energy_budget,
+            "energy_remaining_pct": round(max(0, 1.0 - self.energy_used / self.energy_budget) * 100, 1),
+        }
+
+    def get_action(self):
+        """Rule-based RL agent for web demo: decides per-zone actions."""
+        actions = {}
+        for name in self.ZONE_NAMES:
+            z = self.zones[name]
+            c = self.COMFORT[name]
+            temp_err = z["temp"] - c["temp"]
+            humid_err = z["humidity"] - c["humid"]
+
+            # Smart RL-like policy
+            heater = max(0, min(1, -temp_err * 0.4)) if temp_err < -0.5 else 0
+            cooler = max(0, min(1, temp_err * 0.4)) if temp_err > 0.5 else 0
+
+            # Server room: always try to cool if above target
+            if name == "Server" and temp_err > 0:
+                cooler = max(cooler, min(1, temp_err * 0.6))
+
+            humidifier = max(0, min(1, -humid_err * 0.3)) if humid_err < -3 else 0
+            dehumidifier = max(0, min(1, humid_err * 0.3)) if humid_err > 3 else 0
+
+            # Lab: strict humidity control
+            if name == "Lab":
+                if humid_err < -2:
+                    humidifier = max(humidifier, 0.5)
+                elif humid_err > 2:
+                    dehumidifier = max(dehumidifier, 0.5)
+
+            actions[name] = [heater, cooler, humidifier, dehumidifier]
+        return actions
+
+
 simulators = {
     'rule_based': RuleBasedSimulator(),
     'safe_rl': SafeRLSimulator(),
@@ -214,6 +446,8 @@ simulators = {
     'hierarchical_rl': HierarchicalRLSimulator(),
     'rl_mpc': RLMPCSimulator()
 }
+
+building_hvac_sim = BuildingHVACSimulator()
 
 current_simulator = simulators['rule_based']
 
@@ -257,6 +491,11 @@ def hierarchical_rl():
 @app.route('/rl-mpc')
 def rl_mpc():
     return render_template('rl_mpc.html')
+
+# Multi-Zone HVAC Building页面
+@app.route('/building-hvac')
+def building_hvac():
+    return render_template('building_hvac.html')
 
 @app.route('/api/reset', methods=['POST'])
 def api_reset():
@@ -517,6 +756,30 @@ def api_rl_mpc_step():
         'uncertainty': round(uncertainty, 3),
         'reward': round(reward, 2)
     })
+
+# Building HVAC MAPPO API
+@app.route('/api/building-hvac/reset', methods=['POST'])
+def api_building_hvac_reset():
+    global building_hvac_sim
+    state = building_hvac_sim.reset()
+    return jsonify(state)
+
+@app.route('/api/building-hvac/step', methods=['POST'])
+def api_building_hvac_step():
+    global building_hvac_sim
+    data = request.json or {}
+
+    # Get actions from request or use RL policy
+    if 'actions' in data:
+        actions = data['actions']
+    else:
+        actions = building_hvac_sim.get_action()
+
+    state, reward, comfort_info = building_hvac_sim.step(actions)
+    state['reward'] = round(reward, 3)
+    state['comfort_info'] = comfort_info
+    state['rl_actions'] = building_hvac_sim.get_action()
+    return jsonify(state)
 
 @app.route('/api/pinns/train', methods=['POST'])
 def api_pinns_train():

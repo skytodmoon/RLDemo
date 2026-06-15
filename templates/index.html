@@ -144,70 +144,49 @@
             color: #a0a0a0;
         }
         
-        .gauge-container {
-            position: relative;
-            width: 200px;
-            height: 200px;
-            margin: 0 auto;
-        }
-        
-        .gauge {
-            width: 100%;
-            height: 100%;
-            border-radius: 50%;
-            background: conic-gradient(
-                #ff4757 0deg 45deg,
-                #ffa502 45deg 90deg,
-                #2ed573 90deg 135deg,
-                #ffa502 135deg 180deg,
-                #ff4757 180deg 180deg
-            );
-            mask: radial-gradient(farthest-side, transparent calc(100% - 20px), #fff calc(100% - 20px));
-            -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 20px), #fff calc(100% - 20px));
+        .digital-temp {
             display: flex;
-            align-items: center;
+            align-items: baseline;
             justify-content: center;
+            gap: 8px;
+            margin-bottom: 15px;
         }
         
-        .gauge-center {
-            width: 120px;
-            height: 120px;
-            border-radius: 50%;
-            background: #1a1a2e;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+        .digital-temp .temp-value {
+            font-size: 4rem;
+            font-weight: bold;
+            color: #2ed573;
+            font-family: 'Courier New', monospace;
         }
         
-        .gauge-needle {
-            position: absolute;
-            width: 4px;
-            height: 70px;
-            background: #00d4ff;
-            top: 15%;
-            left: 50%;
-            transform-origin: bottom center;
-            transform: translateX(-50%);
-            transition: transform 0.3s ease;
-            border-radius: 2px;
-        }
-        
-        .gauge-labels {
-            position: absolute;
-            width: 100%;
-            height: 100%;
-            top: 0;
-        }
-        
-        .gauge-label {
-            position: absolute;
-            font-size: 0.8rem;
+        .digital-temp .temp-unit {
+            font-size: 1.5rem;
             color: #a0a0a0;
         }
         
-        .gauge-label.min { top: 60%; left: 5%; }
-        .gauge-label.max { top: 60%; right: 5%; }
-        .gauge-label.mid { top: 5%; left: 50%; transform: translateX(-50%); color: #2ed573; }
+        .temp-range {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 20px;
+            background: rgba(0, 0, 0, 0.1);
+            border-radius: 8px;
+        }
+        
+        .range-min {
+            color: #3498db;
+            font-weight: 500;
+        }
+        
+        .range-target {
+            color: #2ed573;
+            font-weight: 600;
+        }
+        
+        .range-max {
+            color: #e74c3c;
+            font-weight: 500;
+        }
         
         .control-panel {
             display: flex;
@@ -434,6 +413,7 @@
         <div class="nav-bar">
             <a href="/" class="nav-btn active">RL 温控 Demo</a>
             <a href="/pinns" class="nav-btn">PINNs Demo</a>
+            <a href="/building-hvac" class="nav-btn">🏢 Building HVAC</a>
         </div>
         
         <div class="algorithm-selector">
@@ -450,23 +430,14 @@
                 <h2 class="card-title">🌡️ 实时温度监控</h2>
                 
                 <div class="temp-display">
-                    <div class="gauge-container">
-                        <div class="gauge">
-                            <div class="gauge-center">
-                                <span class="temp-value" id="current-temp">25</span>
-                                <span class="temp-unit">°C</span>
-                            </div>
-                        </div>
-                        <div class="gauge-needle" id="gauge-needle"></div>
-                        <div class="gauge-labels">
-                            <span class="gauge-label min">20°C</span>
-                            <span class="gauge-label mid">25°C</span>
-                            <span class="gauge-label max">35°C</span>
-                        </div>
+                    <div class="digital-temp">
+                        <span class="temp-value" id="current-temp">25.00</span>
+                        <span class="temp-unit">°C</span>
                     </div>
-                    
-                    <div class="target-info">
-                        目标温度: <span style="color: #2ed573;">25°C</span>
+                    <div class="temp-range">
+                        <span class="range-min">20°C</span>
+                        <span class="range-target">目标: 25°C</span>
+                        <span class="range-max">35°C</span>
                     </div>
                 </div>
                 
@@ -608,14 +579,8 @@
             resetSimulation();
         }
         
-        function updateGauge(temp) {
-            const percentage = ((temp - TEMP_MIN) / (TEMP_MAX - TEMP_MIN)) * 100;
-            const angle = -135 + (percentage * 2.7);
-            document.getElementById('gauge-needle').style.transform = `translateX(-50%) rotate(${angle}deg)`;
-        }
-        
         function updateStatus(data) {
-            document.getElementById('current-temp').textContent = data.temp;
+            document.getElementById('current-temp').textContent = data.temp.toFixed(2);
             document.getElementById('step-count').textContent = data.step;
             document.getElementById('heater-status').textContent = data.heater ? 'ON' : 'OFF';
             document.getElementById('heater-status').className = 'status-value ' + (data.heater ? 'status-on' : 'status-off');
@@ -623,7 +588,6 @@
             document.getElementById('cooler-status').className = 'status-value ' + (data.cooler ? 'status-on' : 'status-off');
             document.getElementById('action-status').textContent = data.action.toUpperCase();
             document.getElementById('action-status').className = 'status-value action-' + data.action;
-            updateGauge(data.temp);
         }
         
         function updateChart() {

@@ -1,0 +1,99 @@
+/Users/sunqi/Documents/trae_projects/RLDemo/learn_safe_rl.py:245: UserWarning: FigureCanvasAgg is non-interactive, and thus cannot be shown
+  plt.show()
+======================================================================
+ 📚 安全强化学习 - 学习演示
+======================================================================
+
+🎯 学习目标：
+  1. 理解安全强化学习的双层架构
+  2. 观察安全层如何阻止危险动作
+  3. 分析安全裕度的作用
+
+📋 实验设置：
+  - 温度范围: 20°C ~ 35°C
+  - 目标温度: 25°C
+  - 安全裕度: 2°C
+======================================================================
+
+🔬 测试场景：初始温度接近安全边界
+🔄 环境已重置，初始温度: 21.0°C
+
+▶️ 开始运行...
+
+步骤 5:
+  温度: 22.0°C | 目标: 25.0°C
+  基础动作: heat | 最终动作: heat
+  奖励: 4.0
+
+步骤 10:
+  温度: 23.0°C | 目标: 25.0°C
+  基础动作: heat | 最终动作: heat
+  奖励: 6.0
+
+步骤 15:
+  温度: 24.0°C | 目标: 25.0°C
+  基础动作: heat | 最终动作: heat
+  奖励: 8.0
+
+步骤 20:
+  温度: 24.1°C | 目标: 25.0°C
+  基础动作: idle | 最终动作: idle
+  奖励: 8.2
+
+步骤 25:
+  温度: 24.2°C | 目标: 25.0°C
+  基础动作: heat | 最终动作: heat
+  奖励: 8.4
+
+步骤 30:
+  温度: 24.0°C | 目标: 25.0°C
+  基础动作: idle | 最终动作: idle
+  奖励: 8.0
+
+步骤 35:
+  温度: 24.1°C | 目标: 25.0°C
+  基础动作: idle | 最终动作: idle
+  奖励: 8.2
+
+步骤 40:
+  温度: 24.2°C | 目标: 25.0°C
+  基础动作: heat | 最终动作: heat
+  奖励: 8.4
+
+步骤 45:
+  温度: 24.0°C | 目标: 25.0°C
+  基础动作: idle | 最终动作: idle
+  奖励: 8.0
+
+步骤 50:
+  温度: 24.1°C | 目标: 25.0°C
+  基础动作: idle | 最终动作: idle
+  奖励: 8.2
+
+======================================================================
+📊 实验结果分析
+======================================================================
+
+📈 温度统计:
+  平均温度: 23.65°C
+  温度波动: 0.84°C
+  最低温度: 21.20°C
+  最高温度: 24.20°C
+
+🔒 安全统计:
+  安全干预次数: 0 次
+  干预率: 0.0%
+
+✅ 安全验证:
+  温度下限 (20°C): ✓ 未越界
+  温度上限 (35°C): ✓ 未越界
+
+📉 生成可视化图表...
+Traceback (most recent call last):
+  File "/Users/sunqi/Documents/trae_projects/RLDemo/learn_safe_rl.py", line 374, in <module>
+    run_demo()
+  File "/Users/sunqi/Documents/trae_projects/RLDemo/learn_safe_rl.py", line 348, in run_demo
+    plot_safety_intervention(results)
+  File "/Users/sunqi/Documents/trae_projects/RLDemo/learn_safe_rl.py", line 253, in plot_safety_intervention
+    plt.stem(steps, filtered, basefmt=' ', use_line_collection=True, linefmt='r-', markerfmt='ro')
+TypeError: stem() got an unexpected keyword argument 'use_line_collection'

@@ -4,7 +4,7 @@
 
 ## 项目概述
 
-本项目包含两个核心 Demo：
+本项目包含三个核心 Demo：
 
 ### 1. 工业温控强化学习 Demo
 - **温度范围**：20°C - 35°C（安全约束）
@@ -17,19 +17,58 @@
 - **方法**：结合物理机理与深度学习
 - **特点**：无需大量标注数据，自动满足物理约束
 
+### 3. Multi-Zone HVAC 多区域建筑能源管理 Demo 🆕
+- **场景**：4区域建筑（办公室、服务器室、实验室、会议室）
+- **变量**：温度、湿度、占用率（每区域3个，共12个状态变量）
+- **耦合**：区域间热传导（热导矩阵）、外部天气干扰、占用率变化
+- **算法**：MAPPO（Multi-Agent PPO，多智能体近端策略优化）
+- **架构**：Centralized Training, Decentralized Execution (CTDE)
+
 ## 技术架构
 
 ```
 RLDemo/
-├── app.py                      # Flask Web 服务
+├── app.py                         # Flask Web 服务（含所有算法模拟器）
+├── main.py                        # PPO 训练脚本（Stable-Baselines3）
+├── simple_demo.py                 # 简化版规则控制演示
+│
+├── industrial_temp_env.py         # Gymnasium 自定义环境（基础版）
+├── safe_rl_env.py                 # Gymnasium 自定义环境（安全层版）
+│
+├── constrained_rl.py              # CPO 约束策略优化（PyTorch NN）
+├── model_based_rl.py              # MBPO 基于模型的策略优化（PyTorch NN）
+├── hierarchical_rl.py             # 层级RL 选项架构（PyTorch NN）
+├── rl_mpc_hybrid.py               # RL+MPC 混合控制（PyTorch NN）
+│
+├── building_hvac_env.py           # 🆕 多区域HVAC Gymnasium环境
+├── multi_agent_ppo.py             # 🆕 MAPPO 多智能体PPO（PyTorch NN）
+│
+├── pinns_heat_eq.py               # PINNs 热传导方程求解器
+│
+├── safe_rl_demo.py                # 安全RL独立演示
+├── constrained_rl_demo.py         # 约束RL独立演示
+├── mbpo_demo.py                   # MBPO独立演示
+├── hierarchical_rl_demo.py        # 层级RL独立演示
+├── rl_mpc_hybrid_demo.py          # RL+MPC独立演示
+│
+├── learn_safe_rl.py               # 学习版：安全RL
+├── learn_constrained_rl.py        # 学习版：约束RL
+├── learn_mbpo.py                  # 学习版：MBPO
+├── learn_hierarchical_rl.py       # 学习版：层级RL
+├── learn_rl_mpc.py                # 学习版：RL+MPC
+│
 ├── templates/
-│   ├── index.html              # 温控 RL 可视化页面
-│   └── pinns.html              # PINNs 可视化页面
-├── industrial_temp_env.py       # Gymnasium 自定义环境
-├── main.py                     # PPO 训练脚本
-├── simple_demo.py              # 简化版规则控制演示
-├── pinns_heat_eq.py            # PINNs 热传导方程求解器
-└── setup.py                   # 项目配置
+│   ├── index.html                 # 温控 RL 主页（算法选择器）
+│   ├── pinns.html                 # PINNs 可视化页面
+│   ├── safe_rl.html               # 安全RL页面
+│   ├── constrained_rl.html        # 约束RL页面
+│   ├── mbpo.html                  # MBPO页面
+│   ├── hierarchical_rl.html       # 层级RL页面
+│   ├── rl_mpc.html                # RL+MPC页面
+│   └── building_hvac.html         # 🆕 多区域HVAC MAPPO页面
+│
+├── setup.py                       # 项目配置
+└── start.sh                       # 启动脚本
 ```
 
 ## 核心技术栈
@@ -220,6 +259,9 @@ http://127.0.0.1:5000
 
 # 浏览器访问 - PINNs Demo
 http://127.0.0.1:5000/pinns
+
+# 浏览器访问 - 多区域 HVAC MAPPO Demo
+http://127.0.0.1:5000/building-hvac
 ```
 
 ### 方式二：命令行训练（RL）
@@ -412,6 +454,63 @@ class RLMPCSimulator(BaseSimulator):
 
 **优势**：兼顾学习能力和在线优化能力。
 
+### 6. 多智能体 PPO (MAPPO) — 多区域 HVAC 控制 🆕
+
+**核心思想**：多个智能体协作控制建筑的4个区域，每个区域有独立的策略网络，共享一个中央评论家网络评估全局状态。
+
+```python
+# building_hvac_env.py - 多区域HVAC环境
+class BuildingHVACEnv(gym.Env):
+    ZONE_NAMES = ["Office", "Server", "Lab", "Conference"]
+    # 4区域 × 3变量（温度/湿度/占用率）= 12个状态变量
+    # 4区域 × 4控制（加热/冷却/加湿/除湿）= 16维连续动作
+    # 区域间热传导耦合矩阵
+    COUPLING = np.array([
+        [0.0, 0.8, 0.3, 0.6],  # Office <-> Server, Lab, Conference
+        [0.8, 0.0, 0.5, 0.1],  # Server <-> Office, Lab
+        [0.3, 0.5, 0.0, 0.1],  # Lab <-> Office, Server
+        [0.6, 0.1, 0.1, 0.0],  # Conference <-> Office
+    ])
+
+# multi_agent_ppo.py - MAPPO算法
+class MultiAgentPPO:
+    # 集中训练、分散执行 (CTDE)
+    actors = [DecentralizedActor() for _ in range(4)]  # 每区域独立策略
+    critic = CentralizedCritic(state_dim=15)            # 全局共享评论家
+```
+
+**环境特点**：
+- **多变量**：温度、湿度、占用率（每区域3个变量，共12维状态）
+- **多耦合**：区域间热传导（热导矩阵）、天气干扰、占用率变化
+- **连续动作**：16维连续动作空间（4控制 × 4区域，Beta分布）
+- **多目标奖励**：舒适度（占用率加权）+ 能耗惩罚 + 预算约束
+- **外部干扰**：室外温度（昼夜循环）、太阳辐射、占用率时间表
+
+**算法特点**：
+- **CTDE 架构**：集中训练（评论家看全局）+ 分散执行（演员只看局部）
+- **Beta 分布**：连续动作使用 Beta(α, β) 分布，天然限制在 [0,1]
+- **GAE 优势估计**：Generalized Advantage Estimation 稳定训练
+- **PPO 裁剪目标**：ε=0.2 裁剪比率，防止策略更新过大
+- **熵正则化**：鼓励探索，防止过早收敛
+
+**运行方式**：
+```bash
+# 环境测试
+python building_hvac_env.py
+
+# MAPPO训练测试
+python multi_agent_ppo.py
+```
+
+**关键特性**：
+- 4区域建筑仿真（办公室/服务器室/实验室/会议室）
+- 区域间热传导耦合
+- 昼夜天气循环与太阳辐射
+- 能量预算约束
+- 每区域独立HVAC控制（加热/冷却/加湿/除湿）
+
+---
+
 ## 独立演示 Demo
 
 本项目为每种进阶算法提供了独立的演示脚本，可以单独运行查看效果：
@@ -568,11 +667,12 @@ python rl_mpc_hybrid_demo.py
 http://127.0.0.1:5000
 
 # 各算法演示页面
-http://127.0.0.1:5000/safe-rl       # 安全强化学习
-http://127.0.0.1:5000/constrained-rl # 约束强化学习
-http://127.0.0.1:5000/mbpo           # MBPO
+http://127.0.0.1:5000/safe-rl         # 安全强化学习
+http://127.0.0.1:5000/constrained-rl  # 约束强化学习
+http://127.0.0.1:5000/mbpo            # MBPO
 http://127.0.0.1:5000/hierarchical-rl # 层级强化学习
-http://127.0.0.1:5000/rl-mpc        # RL+MPC混合控制
+http://127.0.0.1:5000/rl-mpc          # RL+MPC混合控制
+http://127.0.0.1:5000/building-hvac   # 🆕 多区域HVAC MAPPO
 
 # PINNs演示
 http://127.0.0.1:5000/pinns
@@ -661,14 +761,15 @@ python learn_rl_mpc.py
 | **MBPO** | 基于模型的规划 | 数据效率要求高 | `mbpo_demo.py` | ✅ |
 | **层级 RL** | 分层任务分解 | 长期规划任务 | `hierarchical_rl_demo.py` | ✅ |
 | **RL+MPC** | 混合控制策略 | 需要在线优化的场景 | `rl_mpc_hybrid_demo.py` | ✅ |
+| **MAPPO** 🆕 | 多智能体协作 + CTDE | 多区域耦合系统 | `multi_agent_ppo.py` | ✅ |
 
 ## 项目扩展
 
 ### RL 温控扩展方向
 
-1. **多区域温控**：扩展为多个温度传感器和执行器
+1. **多区域温控** ✅ 已实现：Multi-Zone HVAC MAPPO Demo（4区域、12状态变量、16维动作）
 2. **时变目标**：目标温度随时间变化
-3. **干扰因素**：加入外部温度扰动（模拟环境变化）
+3. **干扰因素** ✅ 已实现：天气干扰（昼夜温度循环、太阳辐射、占用率变化）
 4. **真实硬件**：连接实际传感器和执行器
 5. **PPO 参数调优**：调整网络结构、学习率等超参数
 

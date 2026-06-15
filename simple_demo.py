@@ -25,9 +25,9 @@ class IndustrialTempSim:
         return self.current_temp
     
     def get_action(self):
-        if self.current_temp < self.target_temp - 1.0:
+        if self.current_temp < self.target_temp - 0.5:
             return 'heat'
-        elif self.current_temp > self.target_temp + 1.0:
+        elif self.current_temp > self.target_temp + 0.5:
             return 'cool'
         else:
             return 'idle'

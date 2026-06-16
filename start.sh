@@ -58,6 +58,31 @@ check_dependencies() {
     echo ""
 }
 
+# 检查并释放端口
+release_port() {
+    PORT=5000
+    echo -e "${YELLOW}🔍 检查端口 ${PORT} 是否被占用...${NC}"
+    
+    # 查找占用端口的进程
+    if command -v lsof &> /dev/null; then
+        PID=$(lsof -ti:$PORT)
+    elif command -v fuser &> /dev/null; then
+        PID=$(fuser $PORT/tcp 2>/dev/null | awk '{print $1}')
+    else
+        PID=$(netstat -tlnp 2>/dev/null | grep ":$PORT" | awk '{print $7}' | cut -d'/' -f1)
+    fi
+    
+    if [ -n "$PID" ]; then
+        echo -e "${YELLOW}⚠️  端口 ${PORT} 被进程 ${PID} 占用，正在终止...${NC}"
+        kill -9 $PID 2>/dev/null || true
+        sleep 1
+        echo -e "${GREEN}✅ 端口 ${PORT} 已释放${NC}"
+    else
+        echo -e "${GREEN}✅ 端口 ${PORT} 未被占用${NC}"
+    fi
+    echo ""
+}
+
 # 启动服务
 start_server() {
     echo -e "${YELLOW}🚀 启动 Flask 服务器...${NC}"
@@ -154,6 +179,7 @@ main() {
         -s|--start|*)
             show_welcome
             check_dependencies
+            release_port
             echo -e "${GREEN}🎉 准备就绪，启动服务器...${NC}"
             echo ""
             echo "┌─────────────────────────────────────────────────────────────┐"

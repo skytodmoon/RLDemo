@@ -1,0 +1,778 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tennessee Eastman Process - SAC Control - RLDemo</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            min-height: 100vh; padding: 20px; color: #e0e0e0;
+        }
+        .container { max-width: 1600px; margin: 0 auto; }
+
+        /* Header */
+        header {
+            background: rgba(255,255,255,0.06);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 16px; padding: 25px 30px; margin-bottom: 20px;
+        }
+        header h1 { color: #fff; font-size: 1.9em; margin-bottom: 6px; }
+        header h1 span { color: #e94560; }
+        .subtitle { color: #7f8c8d; font-size: 0.95em; margin-bottom: 12px; }
+        .nav-links { display: flex; gap: 8px; flex-wrap: wrap; }
+        .nav-links a {
+            padding: 7px 14px; background: rgba(255,255,255,0.07); color: #90a4ae;
+            text-decoration: none; border-radius: 8px; font-size: 0.82em; transition: all 0.3s;
+        }
+        .nav-links a:hover { background: rgba(233,69,96,0.3); color: #fff; }
+        .nav-links a.active { background: #e94560; color: #fff; font-weight: 600; }
+
+        /* Controls */
+        .controls-bar {
+            background: rgba(255,255,255,0.06); backdrop-filter: blur(20px);
+            border: 1px solid rgba(255,255,255,0.1); border-radius: 12px;
+            padding: 16px 20px; margin-bottom: 18px; display: flex; align-items: center;
+            gap: 12px; flex-wrap: wrap;
+        }
+        .btn { padding: 9px 20px; border: none; border-radius: 8px; cursor: pointer; font-size: 0.9em; font-weight: 600; transition: all 0.3s; }
+        .btn-start { background: #4caf50; color: #fff; }
+        .btn-stop { background: #f44336; color: #fff; }
+        .btn-reset { background: #ff9800; color: #fff; }
+        .btn-fault { background: #9c27b0; color: #fff; }
+        .btn-clear { background: #607d8b; color: #fff; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .speed-control { display: flex; align-items: center; gap: 6px; color: #78909c; font-size: 0.85em; }
+        .speed-control input { width: 100px; }
+        .status-badge { padding: 5px 12px; border-radius: 16px; font-size: 0.82em; font-weight: 600; }
+        .status-running { background: rgba(76,175,80,0.2); color: #4caf50; }
+        .status-stopped { background: rgba(244,67,54,0.2); color: #f44336; }
+        .status-fault { background: rgba(156,39,176,0.2); color: #ce93d8; }
+
+        /* Fault selector */
+        .fault-selector {
+            display: flex; gap: 6px; align-items: center; margin-left: auto;
+        }
+        .fault-selector select {
+            background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);
+            color: #e0e0e0; padding: 6px 10px; border-radius: 6px; font-size: 0.82em;
+        }
+
+        /* PFD Canvas */
+        .pfd-section {
+            background: rgba(255,255,255,0.06); backdrop-filter: blur(20px);
+            border: 1px solid rgba(255,255,255,0.1); border-radius: 12px;
+            padding: 18px; margin-bottom: 18px;
+        }
+        .pfd-section h2 { color: #e94560; font-size: 1.1em; margin-bottom: 12px; }
+        #pfdCanvas { width: 100%; height: 380px; background: rgba(0,0,0,0.2); border-radius: 10px; }
+
+        /* Variable panels */
+        .panels-grid {
+            display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 18px;
+        }
+        .panel-card {
+            background: rgba(255,255,255,0.06); backdrop-filter: blur(20px);
+            border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 16px;
+        }
+        .panel-card h3 { color: #e94560; font-size: 0.95em; margin-bottom: 10px; }
+        .var-row {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 5px 0; border-bottom: 1px solid rgba(255,255,255,0.04);
+        }
+        .var-name { font-size: 0.78em; color: #78909c; }
+        .var-value { font-size: 0.95em; font-weight: 700; }
+        .var-value.safe { color: #4caf50; }
+        .var-value.warn { color: #ff9800; }
+        .var-value.danger { color: #f44336; }
+        .var-bar { width: 60px; height: 4px; background: rgba(255,255,255,0.1); border-radius: 2px; margin-left: 8px; }
+        .var-bar-fill { height: 100%; border-radius: 2px; transition: width 0.5s; }
+
+        /* Actions display */
+        .actions-grid {
+            display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 18px;
+        }
+        .action-card {
+            background: rgba(255,255,255,0.04); border-radius: 8px; padding: 12px; text-align: center;
+        }
+        .action-card .label { font-size: 0.72em; color: #546e7a; margin-bottom: 4px; }
+        .action-card .value { font-size: 1.3em; font-weight: 700; color: #4fc3f7; }
+        .action-card .unit { font-size: 0.7em; color: #78909c; }
+
+        /* Delay visualization */
+        .delay-section {
+            background: rgba(255,255,255,0.06); backdrop-filter: blur(20px);
+            border: 1px solid rgba(255,255,255,0.1); border-radius: 12px;
+            padding: 18px; margin-bottom: 18px;
+        }
+        .delay-section h2 { color: #e94560; font-size: 1.1em; margin-bottom: 12px; }
+        .delay-bars { display: flex; gap: 12px; flex-wrap: wrap; }
+        .delay-item { flex: 1; min-width: 200px; }
+        .delay-label { font-size: 0.8em; color: #78909c; margin-bottom: 6px; }
+        .delay-buffer {
+            display: flex; gap: 2px; height: 24px; align-items: flex-end;
+        }
+        .delay-cell {
+            flex: 1; border-radius: 2px; transition: height 0.3s;
+            min-width: 4px; position: relative;
+        }
+        .delay-cell.current { border: 1px solid #fff; }
+        .delay-cell .tooltip {
+            display: none; position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%);
+            background: rgba(0,0,0,0.8); color: #fff; padding: 3px 6px; border-radius: 4px;
+            font-size: 0.65em; white-space: nowrap; z-index: 10;
+        }
+        .delay-cell:hover .tooltip { display: block; }
+
+        /* Charts */
+        .charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 18px; }
+        .chart-card {
+            background: rgba(255,255,255,0.06); backdrop-filter: blur(20px);
+            border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 16px;
+        }
+        .chart-card h3 { color: #90a4ae; font-size: 0.95em; margin-bottom: 8px; }
+        .chart-card canvas { width: 100% !important; max-height: 220px; }
+
+        /* Log */
+        .log-card {
+            background: rgba(255,255,255,0.06); backdrop-filter: blur(20px);
+            border: 1px solid rgba(255,255,255,0.1); border-radius: 12px;
+            padding: 16px; margin-bottom: 18px;
+        }
+        .log-card h3 { color: #90a4ae; font-size: 0.95em; margin-bottom: 8px; }
+        .log-container { max-height: 180px; overflow-y: auto; font-family: monospace; font-size: 0.78em; line-height: 1.5; }
+        .log-entry { padding: 2px 0; border-bottom: 1px solid rgba(255,255,255,0.02); }
+        .log-time { color: #455a64; }
+        .log-info { color: #4fc3f7; }
+        .log-warn { color: #ff9800; }
+        .log-error { color: #f44336; }
+        .log-pass { color: #4caf50; }
+
+        /* Architecture */
+        .arch-section {
+            background: rgba(255,255,255,0.06); backdrop-filter: blur(20px);
+            border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 22px;
+        }
+        .arch-section h2 { color: #e94560; font-size: 1.2em; margin-bottom: 12px; }
+        .arch-section p { color: #78909c; line-height: 1.7; margin-bottom: 10px; font-size: 0.9em; }
+        .arch-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 14px; }
+        .arch-card {
+            background: rgba(255,255,255,0.04); border-radius: 10px; padding: 16px;
+            border: 1px solid rgba(255,255,255,0.06);
+        }
+        .arch-card h4 { color: #e94560; margin-bottom: 6px; font-size: 0.95em; }
+        .arch-card p { font-size: 0.82em; color: #78909c; }
+        .arch-card code {
+            display: block; background: rgba(0,0,0,0.3); border-radius: 6px;
+            padding: 8px; margin-top: 6px; font-size: 0.78em; color: #80cbc4; overflow-x: auto;
+        }
+
+        @media (max-width: 900px) {
+            .panels-grid, .charts-grid, .arch-grid { grid-template-columns: 1fr; }
+            .actions-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <!-- Header -->
+    <header>
+        <h1>🏭 Tennessee Eastman <span>SAC</span> Control</h1>
+        <p class="subtitle">多变量耦合大迟滞化工过程控制 — 基于 Soft Actor-Critic 的 Tennessee Eastman Process 控制</p>
+        <div class="nav-links">
+            <a href="/">📊 Dashboard</a>
+            <a href="/safe-rl">🛡️ Safe RL</a>
+            <a href="/constrained-rl">🔒 Constrained RL</a>
+            <a href="/mbpo">🧠 MBPO</a>
+            <a href="/hierarchical-rl">🏗️ Hierarchical RL</a>
+            <a href="/rl-mpc">⚙️ RL+MPC</a>
+            <a href="/pinns">🔬 PINNs</a>
+            <a href="/building-hvac">🏢 HVAC MAPPO</a>
+            <a href="/tep-control" class="active">🏭 TEP SAC</a>
+        </div>
+    </header>
+
+    <!-- Controls -->
+    <div class="controls-bar">
+        <button class="btn btn-start" id="btnStart" onclick="startSim()">▶ Start</button>
+        <button class="btn btn-stop" id="btnStop" onclick="stopSim()" disabled>⏸ Stop</button>
+        <button class="btn btn-reset" onclick="resetSim()">↺ Reset</button>
+        <div class="speed-control">
+            <label>Speed:</label>
+            <input type="range" id="speedSlider" min="50" max="2000" value="400" step="50">
+            <span id="speedLabel">400ms</span>
+        </div>
+        <span class="status-badge status-stopped" id="statusBadge">● Stopped</span>
+        <span style="color:#546e7a;font-size:0.82em;">Step: <strong id="stepCount">0</strong></span>
+        <div class="fault-selector">
+            <select id="faultSelect">
+                <option value="">No Fault</option>
+                <option value="0">Fault 0: Feed A Loss</option>
+                <option value="1">Fault 1: Feed Comp Drift</option>
+                <option value="2">Fault 2: Cooling Water</option>
+                <option value="3">Fault 3: Sep Temp Drift</option>
+                <option value="4">Fault 4: Sensor Drift</option>
+            </select>
+            <button class="btn btn-fault" onclick="injectFault()">Inject</button>
+            <button class="btn btn-clear" onclick="clearFault()">Clear</button>
+        </div>
+    </div>
+
+    <!-- Process Flow Diagram -->
+    <div class="pfd-section">
+        <h2>🏭 Process Flow Diagram (PFD)</h2>
+        <canvas id="pfdCanvas"></canvas>
+    </div>
+
+    <!-- Variable Panels -->
+    <div class="panels-grid">
+        <div class="panel-card">
+            <h3>🔥 Reactor</h3>
+            <div class="var-row"><span class="var-name">Temperature</span><span class="var-value" id="v-reactor_temp">--</span><div class="var-bar"><div class="var-bar-fill" id="b-reactor_temp" style="width:50%;background:#4caf50;"></div></div></div>
+            <div class="var-row"><span class="var-name">Pressure</span><span class="var-value" id="v-reactor_pressure">--</span><div class="var-bar"><div class="var-bar-fill" id="b-reactor_pressure" style="width:50%;background:#4caf50;"></div></div></div>
+            <div class="var-row"><span class="var-name">Level</span><span class="var-value" id="v-reactor_level">--</span><div class="var-bar"><div class="var-bar-fill" id="b-reactor_level" style="width:50%;background:#4caf50;"></div></div></div>
+        </div>
+        <div class="panel-card">
+            <h3>💨 Separator</h3>
+            <div class="var-row"><span class="var-name">Temperature</span><span class="var-value" id="v-separator_temp">--</span><div class="var-bar"><div class="var-bar-fill" id="b-separator_temp" style="width:50%;background:#4caf50;"></div></div></div>
+            <div class="var-row"><span class="var-name">Level</span><span class="var-value" id="v-separator_level">--</span><div class="var-bar"><div class="var-bar-fill" id="b-separator_level" style="width:50%;background:#4caf50;"></div></div></div>
+            <div class="var-row"><span class="var-name">Recycle Flow</span><span class="var-value" id="v-recycle_flow">--</span><div class="var-bar"><div class="var-bar-fill" id="b-recycle_flow" style="width:50%;background:#4caf50;"></div></div></div>
+        </div>
+        <div class="panel-card">
+            <h3>🧪 Product</h3>
+            <div class="var-row"><span class="var-name">Flow Rate</span><span class="var-value" id="v-product_flow">--</span><div class="var-bar"><div class="var-bar-fill" id="b-product_flow" style="width:50%;background:#4caf50;"></div></div></div>
+            <div class="var-row"><span class="var-name">Comp A (target &lt;0.01)</span><span class="var-value" id="v-product_comp_A">--</span><div class="var-bar"><div class="var-bar-fill" id="b-product_comp_A" style="width:50%;background:#4caf50;"></div></div></div>
+            <div class="var-row"><span class="var-name">Quality</span><span class="var-value" id="v-quality">--</span></div>
+        </div>
+    </div>
+
+    <!-- Actions -->
+    <div class="actions-grid" id="actionsGrid">
+        <div class="action-card"><div class="label">Feed D (流2)</div><div class="value" id="a-feed_D">--</div><div class="unit">m³/h</div></div>
+        <div class="action-card"><div class="label">Feed E (流3)</div><div class="value" id="a-feed_E">--</div><div class="unit">m³/h</div></div>
+        <div class="action-card"><div class="label">Feed A (流1)</div><div class="value" id="a-feed_A">--</div><div class="unit">m³/h</div></div>
+        <div class="action-card"><div class="label">Recycle Valve (流4)</div><div class="value" id="a-recycle_valve">--</div><div class="unit">%</div></div>
+        <div class="action-card"><div class="label">Purge Valve (流9)</div><div class="value" id="a-purge_valve">--</div><div class="unit">%</div></div>
+        <div class="action-card"><div class="label">Cooling Water</div><div class="value" id="a-cooling_water">--</div><div class="unit">°C</div></div>
+    </div>
+
+    <!-- Delay Visualization -->
+    <div class="delay-section">
+        <h2>⏱️ Delay Analysis (大迟滞可视化)</h2>
+        <p style="color:#78909c;font-size:0.82em;margin-bottom:10px;">
+            传输延迟: 物料从反应器到分离器 ~10步 | 分析仪延迟: 组分测量 ~20步 | 温度惯性: 时间常数 ~15步
+        </p>
+        <div class="delay-bars">
+            <div class="delay-item">
+                <div class="delay-label">Reactor Temp Buffer (传输延迟, 10步)</div>
+                <div class="delay-buffer" id="delay-temp"></div>
+            </div>
+            <div class="delay-item">
+                <div class="delay-label">Composition Buffer (分析仪延迟, 20步)</div>
+                <div class="delay-buffer" id="delay-comp"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts -->
+    <div class="charts-grid">
+        <div class="chart-card">
+            <h3>🌡️ Reactor Temperature & Pressure</h3>
+            <canvas id="chartTemp"></canvas>
+        </div>
+        <div class="chart-card">
+            <h3>🧪 Product Composition A</h3>
+            <canvas id="chartComp"></canvas>
+        </div>
+        <div class="chart-card">
+            <h3>📊 Levels (Reactor / Separator / Stripper)</h3>
+            <canvas id="chartLevel"></canvas>
+        </div>
+        <div class="chart-card">
+            <h3>📈 Reward & Quality</h3>
+            <canvas id="chartReward"></canvas>
+        </div>
+    </div>
+
+    <!-- Log -->
+    <div class="log-card">
+        <h3>📋 Event Log</h3>
+        <div class="log-container" id="logContainer"></div>
+    </div>
+
+    <!-- Architecture -->
+    <div class="arch-section">
+        <h2>📐 Technical Architecture: TEP + SAC</h2>
+        <p>Tennessee Eastman Process (TEP) 是化工过程控制领域的"黄金基准"，由 Downs & Vogel (1993) 提出。它模拟一个完整的化工厂，包含反应器、冷凝器、分离器、汽提塔和循环回路。本 Demo 使用 Soft Actor-Critic (SAC) 算法进行控制。</p>
+        <div class="arch-grid">
+            <div class="arch-card">
+                <h4>🏭 Process Dynamics</h4>
+                <p>TEP 包含 5 个耦合单元：反应器(A+B→C→D→E)、冷凝器、分离器、汽提塔、循环回路。温度/压力/流量/组分深度耦合。</p>
+                <code>反应器: A+B→C, A+C→D, A+D→E
+冷却水 ↔ 反应温度 ↔ 反应速率
+进料 ↔ 液位 ↔ 压力 ↔ 排放</code>
+            </div>
+            <div class="arch-card">
+                <h4>⏱️ Large Delays (大迟滞)</h4>
+                <p>传输延迟（反应器→分离器 ~10步）、分析仪延迟（组分测量 ~20步）、温度热惯性（时间常数 ~15步）。</p>
+                <code>传输延迟: deque buffer, 10 steps
+分析仪延迟: deque buffer, 20 steps
+温度惯性: τ=15, 一阶惯性响应</code>
+            </div>
+            <div class="arch-card">
+                <h4>🤖 SAC Algorithm</h4>
+                <p>Soft Actor-Critic 是 off-policy 算法，适合连续控制和大迟滞场景。自动温度调节、双 Q 网络、重参数化技巧。</p>
+                <code>Actor: Squashed Gaussian π(a|s)
+Critic: Twin Q-networks min(Q1,Q2)
+α auto-tune: H_target = -dim(a)</code>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// ============================================================
+// State
+// ============================================================
+let isRunning = false;
+let timerId = null;
+let stepCount = 0;
+const MAX_HIST = 150;
+
+const history = { labels: [], reactor_temp: [], reactor_pressure: [], product_comp_A: [], reactor_level: [], separator_level: [], stripper_level: [], reward: [], quality: [] };
+
+// ============================================================
+// Charts
+// ============================================================
+function makeChart(id, datasets, yLabel, min, max) {
+    return new Chart(document.getElementById(id).getContext('2d'), {
+        type: 'line',
+        data: { labels: [], datasets },
+        options: {
+            responsive: true, animation: { duration: 200 },
+            plugins: { legend: { labels: { color: '#78909c', font: { size: 10 } } } },
+            scales: {
+                x: { ticks: { color: '#455a64', maxTicksLimit: 8 }, grid: { color: 'rgba(255,255,255,0.03)' } },
+                y: { title: { display: true, text: yLabel, color: '#546e7a' }, ticks: { color: '#455a64' }, grid: { color: 'rgba(255,255,255,0.03)' }, suggestedMin: min, suggestedMax: max },
+            },
+        },
+    });
+}
+
+const chartTemp = makeChart('chartTemp', [
+    { label: 'Reactor Temp (°C)', data: [], borderColor: '#ef5350', borderWidth: 2, pointRadius: 0, tension: 0.3 },
+    { label: 'Pressure (kPa/20)', data: [], borderColor: '#42a5f5', borderWidth: 2, pointRadius: 0, tension: 0.3, yAxisID: 'y' },
+], '°C / kPa', 80, 160);
+
+const chartComp = makeChart('chartComp', [
+    { label: 'Comp A', data: [], borderColor: '#ffa726', borderWidth: 2, pointRadius: 0, tension: 0.3 },
+    { label: 'Limit (0.01)', data: [], borderColor: '#f44336', borderWidth: 1, borderDash: [5,5], pointRadius: 0 },
+], 'mol fraction', 0, 0.03);
+
+const chartLevel = makeChart('chartLevel', [
+    { label: 'Reactor', data: [], borderColor: '#ef5350', borderWidth: 2, pointRadius: 0, tension: 0.3 },
+    { label: 'Separator', data: [], borderColor: '#42a5f5', borderWidth: 2, pointRadius: 0, tension: 0.3 },
+    { label: 'Stripper', data: [], borderColor: '#66bb6a', borderWidth: 2, pointRadius: 0, tension: 0.3 },
+], '%', 0, 100);
+
+const chartReward = makeChart('chartReward', [
+    { label: 'Reward', data: [], borderColor: '#ab47bc', borderWidth: 2, pointRadius: 0, tension: 0.3 },
+    { label: 'Quality (0=Fail, 1=Pass)', data: [], borderColor: '#4caf50', borderWidth: 2, pointRadius: 0, tension: 0.3 },
+], '', -3, 2);
+
+// ============================================================
+// PFD Canvas
+// ============================================================
+const pfdCanvas = document.getElementById('pfdCanvas');
+const pfdCtx = pfdCanvas.getContext('2d');
+
+function resizePFD() {
+    pfdCanvas.width = pfdCanvas.offsetWidth * 2;
+    pfdCanvas.height = pfdCanvas.offsetHeight * 2;
+    pfdCtx.scale(2, 2);
+}
+resizePFD();
+window.addEventListener('resize', () => { resizePFD(); });
+
+const UNITS = {
+    reactor:   { x: 0.10, y: 0.40, w: 0.15, h: 0.38, label: 'REACTOR', icon: '🔥' },
+    condenser: { x: 0.30, y: 0.22, w: 0.11, h: 0.22, label: 'CONDENSER', icon: '❄️' },
+    separator: { x: 0.47, y: 0.38, w: 0.13, h: 0.30, label: 'SEPARATOR', icon: '💨' },
+    stripper:  { x: 0.66, y: 0.40, w: 0.13, h: 0.30, label: 'STRIPPER', icon: '🧪' },
+};
+
+const STREAMS = [
+    { from: [0.02, 0.50], to: [0.10, 0.50], label: 'Feed A (流1)', color: '#4fc3f7' },
+    { from: [0.02, 0.38], to: [0.10, 0.38], label: 'Feed D (流2)', color: '#66bb6a' },
+    { from: [0.02, 0.62], to: [0.10, 0.62], label: 'Feed E (流3)', color: '#ffa726' },
+    { from: [0.25, 0.48], to: [0.30, 0.33], label: 'Vapor', color: '#b0bec5' },
+    { from: [0.25, 0.58], to: [0.47, 0.53], label: 'Liquid', color: '#42a5f5' },
+    { from: [0.41, 0.33], to: [0.47, 0.48], label: 'Condensed', color: '#90caf9' },
+    { from: [0.47, 0.50], to: [0.35, 0.50], label: 'Recycle (流4)', color: '#ce93d8' },
+    { from: [0.60, 0.53], to: [0.66, 0.53], label: 'To Stripper', color: '#42a5f5' },
+    { from: [0.79, 0.53], to: [0.95, 0.53], label: 'Product (流10)', color: '#4caf50' },
+    { from: [0.53, 0.38], to: [0.53, 0.12], label: 'Purge (流9)', color: '#ff7043' },
+];
+
+let animPhase = 0;
+
+function drawPFD(state) {
+    const w = pfdCanvas.width / 2;
+    const h = pfdCanvas.height / 2;
+    pfdCtx.clearRect(0, 0, w, h);
+    animPhase += 0.02;
+
+    // Draw streams (animated flow)
+    for (const stream of STREAMS) {
+        const [x1, y1] = stream.from.map((v, i) => i === 0 ? v * w : v * h);
+        const [x2, y2] = stream.to.map((v, i) => i === 0 ? v * w : v * h);
+
+        pfdCtx.beginPath();
+        pfdCtx.moveTo(x1, y1);
+        pfdCtx.lineTo(x2, y2);
+        pfdCtx.strokeStyle = stream.color + '60';
+        pfdCtx.lineWidth = 3;
+        pfdCtx.stroke();
+
+        // Animated dots
+        const dx = x2 - x1, dy = y2 - y1;
+        const len = Math.sqrt(dx * dx + dy * dy);
+        const numDots = Math.max(2, Math.floor(len / 20));
+        for (let i = 0; i < numDots; i++) {
+            const t = ((i / numDots + animPhase) % 1);
+            const px = x1 + dx * t;
+            const py = y1 + dy * t;
+            pfdCtx.beginPath();
+            pfdCtx.arc(px, py, 2.5, 0, Math.PI * 2);
+            pfdCtx.fillStyle = stream.color;
+            pfdCtx.fill();
+        }
+
+        // Label
+        const mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
+        pfdCtx.font = '9px sans-serif';
+        pfdCtx.fillStyle = stream.color + 'aa';
+        pfdCtx.textAlign = 'center';
+        pfdCtx.fillText(stream.label, mx, my - 6);
+    }
+
+    // Draw units
+    for (const [key, unit] of Object.entries(UNITS)) {
+        const ux = unit.x * w, uy = unit.y * h;
+        const uw = unit.w * w, uh = unit.h * h;
+
+        // Get color based on state
+        let fillColor = 'rgba(255,255,255,0.06)';
+        let borderColor = 'rgba(255,255,255,0.3)';
+        if (state) {
+            if (key === 'reactor') {
+                const temp = state.state?.reactor_temp?.value || 120;
+                const r = Math.min(255, Math.max(0, (temp - 100) * 4));
+                fillColor = `rgba(${r}, ${100 - r * 0.3}, ${200 - r * 0.5}, 0.15)`;
+                borderColor = temp > 140 ? '#f44336' : temp > 130 ? '#ff9800' : '#4caf50';
+            }
+        }
+
+        // Unit box
+        pfdCtx.fillStyle = fillColor;
+        pfdCtx.strokeStyle = borderColor;
+        pfdCtx.lineWidth = 2;
+        pfdCtx.beginPath();
+        pfdCtx.roundRect(ux, uy, uw, uh, 8);
+        pfdCtx.fill();
+        pfdCtx.stroke();
+
+        // Icon and label
+        pfdCtx.font = '20px sans-serif';
+        pfdCtx.textAlign = 'center';
+        pfdCtx.fillStyle = '#fff';
+        pfdCtx.fillText(unit.icon, ux + uw / 2, uy + uh / 2 - 4);
+        pfdCtx.font = 'bold 10px sans-serif';
+        pfdCtx.fillStyle = borderColor;
+        pfdCtx.fillText(unit.label, ux + uw / 2, uy + uh / 2 + 14);
+
+        // State values
+        if (state && state.state) {
+            pfdCtx.font = '9px monospace';
+            pfdCtx.fillStyle = '#b0bec5';
+            let valY = uy + uh / 2 + 26;
+            if (key === 'reactor' && state.state.reactor_temp) {
+                pfdCtx.fillText(`${state.state.reactor_temp.value}°C`, ux + uw / 2, valY);
+                valY += 12;
+                pfdCtx.fillText(`${state.state.reactor_pressure.value}kPa`, ux + uw / 2, valY);
+            }
+            if (key === 'separator' && state.state.separator_temp) {
+                pfdCtx.fillText(`${state.state.separator_temp.value}°C`, ux + uw / 2, valY);
+            }
+            if (key === 'stripper' && state.state.product_flow) {
+                const flow = Math.max(0, state.state.product_flow.value);
+                pfdCtx.fillText(`${flow.toFixed(2)}m³/h`, ux + uw / 2, valY);
+            }
+        }
+    }
+
+    // Legend
+    pfdCtx.font = '9px sans-serif';
+    pfdCtx.fillStyle = '#546e7a';
+    pfdCtx.textAlign = 'left';
+    pfdCtx.fillText('Flow: dots animate direction | Color: green=safe, orange=warning, red=danger', 10, h - 8);
+}
+
+// ============================================================
+// UI Updates
+// ============================================================
+function updateVarPanels(state) {
+    if (!state || !state.state) return;
+    const s = state.state;
+
+    const vars = [
+        { key: 'reactor_temp', unit: '°C', min: 80, max: 160 },
+        { key: 'reactor_pressure', unit: 'kPa', min: 2000, max: 3200 },
+        { key: 'reactor_level', unit: '%', min: 0, max: 100 },
+        { key: 'separator_temp', unit: '°C', min: 50, max: 120 },
+        { key: 'separator_level', unit: '%', min: 0, max: 100 },
+        { key: 'recycle_flow', unit: 'm³/h', min: 5, max: 45 },
+        { key: 'product_flow', unit: 'm³/h', min: 5, max: 40 },
+        { key: 'product_comp_A', unit: 'mol', min: 0, max: 0.05 },
+    ];
+
+    for (const v of vars) {
+        const el = document.getElementById(`v-${v.key}`);
+        const bar = document.getElementById(`b-${v.key}`);
+        if (!el || !s[v.key]) continue;
+
+        const val = s[v.key].value;
+        const safe = s[v.key].safe !== false;
+        const warning = s[v.key].warning;
+        const pass = s[v.key].pass;
+
+        el.textContent = typeof val === 'number' ? (v.key === 'product_comp_A' ? val.toFixed(4) : val.toFixed(1)) : val;
+        el.className = 'var-value ' + (pass === true ? 'safe' : pass === false ? 'danger' : safe ? (warning ? 'warn' : 'safe') : 'danger');
+
+        if (bar) {
+            const pct = Math.max(0, Math.min(100, (val - v.min) / (v.max - v.min) * 100));
+            bar.style.width = pct + '%';
+            bar.style.background = pass === true ? '#4caf50' : pass === false ? '#f44336' : safe ? '#4caf50' : '#f44336';
+        }
+    }
+
+    // Quality badge
+    const qEl = document.getElementById('v-quality');
+    if (qEl && s.product_comp_A) {
+        const pass = s.product_comp_A.pass;
+        qEl.textContent = pass ? '✓ PASS' : '✗ FAIL';
+        qEl.className = 'var-value ' + (pass ? 'safe' : 'danger');
+    }
+}
+
+function updateActions(actions) {
+    if (!actions) return;
+    for (const [key, val] of Object.entries(actions)) {
+        const el = document.getElementById(`a-${key}`);
+        if (el) {
+            if (key === 'recycle_valve' || key === 'purge_valve') {
+                el.textContent = (val * 100).toFixed(1);
+            } else {
+                el.textContent = val.toFixed(1);
+            }
+        }
+    }
+}
+
+function updateDelayViz(delayInfo) {
+    if (!delayInfo) return;
+
+    // Temperature buffer
+    const tempContainer = document.getElementById('delay-temp');
+    tempContainer.innerHTML = '';
+    const tempBuf = delayInfo.temp_buffer || [];
+    const tempMin = 100, tempMax = 150;
+    for (let i = 0; i < 10; i++) {
+        const val = tempBuf[i] || 120;
+        const pct = Math.max(5, (val - tempMin) / (tempMax - tempMin) * 100);
+        const cell = document.createElement('div');
+        cell.className = 'delay-cell' + (i === tempBuf.length - 1 ? ' current' : '');
+        cell.style.height = pct + '%';
+        cell.style.background = val > 140 ? '#f44336' : val > 130 ? '#ff9800' : '#4caf50';
+        cell.innerHTML = `<span class="tooltip">${val.toFixed(1)}°C</span>`;
+        tempContainer.appendChild(cell);
+    }
+
+    // Composition buffer
+    const compContainer = document.getElementById('delay-comp');
+    compContainer.innerHTML = '';
+    const compBuf = delayInfo.comp_buffer || [];
+    for (let i = 0; i < 20; i++) {
+        const val = compBuf[i] || 0.005;
+        const pct = Math.max(5, val / 0.03 * 100);
+        const cell = document.createElement('div');
+        cell.className = 'delay-cell' + (i === compBuf.length - 1 ? ' current' : '');
+        cell.style.height = pct + '%';
+        cell.style.background = val > 0.01 ? '#f44336' : val > 0.008 ? '#ff9800' : '#4caf50';
+        cell.innerHTML = `<span class="tooltip">${val.toFixed(4)}</span>`;
+        compContainer.appendChild(cell);
+    }
+}
+
+function updateCharts() {
+    const labels = history.labels;
+    chartTemp.data.labels = labels;
+    chartTemp.data.datasets[0].data = history.reactor_temp;
+    chartTemp.data.datasets[1].data = history.reactor_pressure.map(v => v / 20);
+    chartTemp.update('none');
+
+    chartComp.data.labels = labels;
+    chartComp.data.datasets[0].data = history.product_comp_A;
+    chartComp.data.datasets[1].data = labels.map(() => 0.01);
+    chartComp.update('none');
+
+    chartLevel.data.labels = labels;
+    chartLevel.data.datasets[0].data = history.reactor_level;
+    chartLevel.data.datasets[1].data = history.separator_level;
+    chartLevel.data.datasets[2].data = history.stripper_level;
+    chartLevel.update('none');
+
+    chartReward.data.labels = labels;
+    chartReward.data.datasets[0].data = history.reward;
+    chartReward.data.datasets[1].data = history.quality;
+    chartReward.update('none');
+}
+
+function addLog(msg, type = 'info') {
+    const container = document.getElementById('logContainer');
+    const entry = document.createElement('div');
+    entry.className = 'log-entry';
+    const time = new Date().toLocaleTimeString();
+    const cls = type === 'warn' ? 'log-warn' : type === 'error' ? 'log-error' : type === 'pass' ? 'log-pass' : 'log-info';
+    entry.innerHTML = `<span class="log-time">[${time}]</span> <span class="${cls}">${msg}</span>`;
+    container.prepend(entry);
+    while (container.children.length > 80) container.removeChild(container.lastChild);
+}
+
+// ============================================================
+// API Calls
+// ============================================================
+async function resetSim() {
+    stopSim();
+    try {
+        const resp = await fetch('/api/tep/reset', { method: 'POST' });
+        const data = await resp.json();
+        stepCount = 0;
+        document.getElementById('stepCount').textContent = '0';
+        history.labels = []; history.reactor_temp = []; history.reactor_pressure = [];
+        history.product_comp_A = []; history.reactor_level = []; history.separator_level = [];
+        history.stripper_level = []; history.reward = []; history.quality = [];
+        updateUI(data);
+        addLog('🔄 TEP simulation reset — all units at normal operating conditions', 'info');
+    } catch (e) { addLog('❌ Reset failed: ' + e.message, 'error'); }
+}
+
+async function simStep() {
+    try {
+        const resp = await fetch('/api/tep/step', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+        const data = await resp.json();
+        stepCount++;
+        document.getElementById('stepCount').textContent = stepCount;
+        updateUI(data);
+
+        // Log events
+        if (data.reward_info?.product_quality === 'Fail' && stepCount % 5 === 0) {
+            addLog(`⚠️ Step ${stepCount}: Product quality FAIL (A=${data.state?.product_comp_A?.value?.toFixed(4)})`, 'warn');
+        }
+        if (stepCount % 20 === 0) {
+            addLog(`📊 Step ${stepCount}: Reward=${data.reward?.toFixed(2)}, Quality=${data.reward_info?.product_quality}`, data.reward_info?.product_quality === 'Pass' ? 'pass' : 'warn');
+        }
+        if (data.active_fault !== null && data.active_fault !== undefined) {
+            if (stepCount % 10 === 0) addLog(`🚨 Fault ${data.active_fault} active since step ${stepCount}`, 'error');
+        }
+    } catch (e) { addLog('❌ Step failed: ' + e.message, 'error'); stopSim(); }
+}
+
+function updateUI(data) {
+    updateVarPanels(data);
+    updateActions(data.actions);
+    updateDelayViz(data.delay_info);
+    drawPFD(data);
+
+    // History
+    history.labels.push(`S${stepCount}`);
+    if (history.labels.length > MAX_HIST) history.labels.shift();
+    const push = (arr, val) => { arr.push(val); if (arr.length > MAX_HIST) arr.shift(); };
+    push(history.reactor_temp, data.state?.reactor_temp?.value || 120);
+    push(history.reactor_pressure, data.state?.reactor_pressure?.value || 2700);
+    push(history.product_comp_A, data.state?.product_comp_A?.value || 0.005);
+    push(history.reactor_level, data.state?.reactor_level?.value || 65);
+    push(history.separator_level, data.state?.separator_level?.value || 50);
+    push(history.stripper_level, data.state?.stripper_level?.value || 50);
+    push(history.reward, data.reward || 0);
+    push(history.quality, data.reward_info?.product_quality === 'Pass' ? 1 : 0);
+
+    updateCharts();
+}
+
+// ============================================================
+// Control
+// ============================================================
+function startSim() {
+    if (isRunning) return;
+    isRunning = true;
+    document.getElementById('btnStart').disabled = true;
+    document.getElementById('btnStop').disabled = false;
+    document.getElementById('statusBadge').className = 'status-badge status-running';
+    document.getElementById('statusBadge').textContent = '● Running';
+    addLog('▶ TEP simulation started — SAC agent controlling process', 'info');
+    runLoop();
+}
+
+function stopSim() {
+    isRunning = false;
+    if (timerId) { clearTimeout(timerId); timerId = null; }
+    document.getElementById('btnStart').disabled = false;
+    document.getElementById('btnStop').disabled = true;
+    document.getElementById('statusBadge').className = 'status-badge status-stopped';
+    document.getElementById('statusBadge').textContent = '● Stopped';
+}
+
+function runLoop() {
+    if (!isRunning) return;
+    const speed = parseInt(document.getElementById('speedSlider').value);
+    simStep().then(() => { timerId = setTimeout(runLoop, speed); });
+}
+
+async function injectFault() {
+    const sel = document.getElementById('faultSelect');
+    const faultId = sel.value;
+    if (faultId === '') return;
+    try {
+        await fetch('/api/tep/fault', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fault_id: parseInt(faultId) }) });
+        addLog(`🚨 Fault ${faultId} injected: ${sel.options[sel.selectedIndex].text}`, 'error');
+        document.getElementById('statusBadge').className = 'status-badge status-fault';
+        document.getElementById('statusBadge').textContent = `● Fault ${faultId}`;
+    } catch (e) { addLog('❌ Fault injection failed', 'error'); }
+}
+
+async function clearFault() {
+    try {
+        await fetch('/api/tep/fault', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) });
+        addLog('✅ Fault cleared', 'info');
+        document.getElementById('statusBadge').className = 'status-badge status-stopped';
+        document.getElementById('statusBadge').textContent = '● Stopped';
+    } catch (e) { addLog('❌ Clear fault failed', 'error'); }
+}
+
+document.getElementById('speedSlider').addEventListener('input', function() {
+    document.getElementById('speedLabel').textContent = this.value + 'ms';
+});
+
+// ============================================================
+// Init
+// ============================================================
+drawPFD(null);
+resetSim();
+</script>
+</body>
+</html>

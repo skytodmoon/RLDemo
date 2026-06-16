@@ -438,6 +438,283 @@ class BuildingHVACSimulator:
         return actions
 
 
+class TEPSimulator:
+    """
+    Tennessee Eastman Process simulator for web demo.
+    Simplified physics with coupling and delays.
+    """
+
+    # Normal operating conditions
+    NORM = {
+        'reactor_temp': 120.0, 'reactor_pressure': 2700.0, 'reactor_level': 65.0,
+        'separator_temp': 80.0, 'separator_level': 50.0, 'stripper_level': 50.0,
+        'product_flow': 22.0, 'product_comp_A': 0.005,
+        'feed_total': 40.0, 'feed_ratio_D': 0.3,
+        'cooling_water_temp': 35.0, 'recycle_flow': 25.0,
+        'purge_rate': 0.5, 'compressor_work': 100.0, 'agitator_speed': 200.0,
+    }
+
+    # Safety limits
+    SAFETY = {
+        'reactor_temp_max': 150.0, 'reactor_press_max': 3000.0,
+        'reactor_level_max': 100.0, 'reactor_level_min': 15.0,
+    }
+
+    def __init__(self):
+        self.reset()
+
+    def reset(self):
+        self.step_count = 0
+        self.active_fault = None
+        self.fault_step = 0
+
+        # Initialize state near normal conditions
+        self.state = {}
+        for key, val in self.NORM.items():
+            self.state[key] = val + np.random.normal(0, val * 0.02)
+
+        # Delay buffers
+        self.temp_buffer = [self.state['reactor_temp']] * 10
+        self.comp_buffer = [self.state['product_comp_A']] * 20
+        self.level_buffer = [self.state['reactor_level']] * 8
+
+        # Actions (default)
+        self.actions = {
+            'feed_D': 15.0, 'feed_E': 15.0, 'feed_A': 22.5,
+            'recycle_valve': 0.5, 'purge_valve': 0.25, 'cooling_water': 35.0,
+        }
+
+        return self._get_state()
+
+    def step(self, actions=None):
+        if actions is None:
+            actions = self.get_action()
+        self.actions = actions
+
+        s = self.state
+        a = actions
+
+        # Get delayed values
+        delayed_temp = self.temp_buffer[0]
+        delayed_level = self.level_buffer[0]
+
+        # Reaction rates (coupled to temperature)
+        T = s['reactor_temp']
+        k3 = 0.02 * np.exp(-4000 / (T + 273))
+        reaction_rate = k3 * a['feed_A'] * a['feed_D'] * 0.01
+        heat_gen = reaction_rate * 200
+
+        # Heat removal (cooling water coupling)
+        heat_removal = (s['reactor_temp'] - a['cooling_water']) * 2.0
+
+        # Update reactor temperature (thermal inertia - large time constant)
+        tau_temp = 15.0
+        target_temp = s['reactor_temp'] + (heat_gen - heat_removal) * 0.01
+        recycle_effect = (delayed_temp - s['reactor_temp']) * 0.02 * a['recycle_valve']
+        s['reactor_temp'] += (target_temp - s['reactor_temp'] + recycle_effect) / tau_temp
+        s['reactor_temp'] += np.random.normal(0, 0.3)
+
+        # Update reactor pressure (coupled to temperature and purge)
+        tau_press = 8.0
+        press_target = self.NORM['reactor_pressure'] + (s['reactor_temp'] - self.NORM['reactor_temp']) * 5.0 - a['purge_valve'] * 400
+        s['reactor_pressure'] += (press_target - s['reactor_pressure']) / tau_press
+        s['reactor_pressure'] += np.random.normal(0, 5)
+
+        # Update reactor level (coupled to feed and product)
+        total_feed = a['feed_A'] + a['feed_D'] + a['feed_E']
+        product_out = s['product_flow'] * 0.3
+        level_change = (total_feed + s['recycle_flow'] * a['recycle_valve'] - product_out) * 0.5
+        s['reactor_level'] += level_change / 8.0
+        s['reactor_level'] += np.random.normal(0, 0.3)
+
+        # Separator temperature (transport delay from reactor)
+        sep_target = delayed_temp * 0.7 + 20
+        s['separator_temp'] += (sep_target - s['separator_temp']) / 12.0
+        s['separator_temp'] += np.random.normal(0, 0.2)
+
+        # Separator level (coupled to reactor level via delay)
+        sep_level_target = self.NORM['separator_level'] + (delayed_level - self.NORM['reactor_level']) * 0.3
+        s['separator_level'] += (sep_level_target - s['separator_level'] - a['recycle_valve'] * 2) / 8.0
+        s['separator_level'] += np.random.normal(0, 0.3)
+
+        # Stripper level
+        strip_in = s['separator_level'] * 0.1
+        s['stripper_level'] += (strip_in - product_out * 0.2) / 6.0
+        s['stripper_level'] += np.random.normal(0, 0.3)
+
+        # Product flow
+        product_target = self.NORM['product_flow'] + reaction_rate * 10 - (s['stripper_level'] - self.NORM['stripper_level']) * 0.1
+        s['product_flow'] += (product_target - s['product_flow']) / 5.0
+        s['product_flow'] += np.random.normal(0, 0.2)
+
+        # Product composition A (analyzer delay - large)
+        comp_target = self.NORM['product_comp_A'] + (s['reactor_temp'] - self.NORM['reactor_temp']) * 0.0001
+        comp_target += (self.NORM['feed_ratio_D'] - a['feed_D'] / (a['feed_D'] + a['feed_E'] + 0.01)) * 0.005
+        s['product_comp_A'] += (comp_target - s['product_comp_A']) / 10.0
+        s['product_comp_A'] += np.random.normal(0, 0.0002)
+        s['product_comp_A'] = max(0, s['product_comp_A'])
+
+        # Other variables
+        s['feed_total'] = total_feed + np.random.normal(0, 0.2)
+        s['feed_ratio_D'] = a['feed_D'] / (a['feed_D'] + a['feed_E'] + 0.01)
+        s['cooling_water_temp'] = a['cooling_water'] + np.random.normal(0, 0.3)
+        s['recycle_flow'] += (s['separator_level'] * 0.3 * a['recycle_valve'] + 5 - s['recycle_flow']) / 5.0
+        s['purge_rate'] = a['purge_valve'] + np.random.normal(0, 0.01)
+        s['compressor_work'] = self.NORM['compressor_work'] + (s['recycle_flow'] - self.NORM['recycle_flow']) * 2
+        s['agitator_speed'] = self.NORM['agitator_speed'] + np.random.normal(0, 1)
+
+        # Update delay buffers
+        self.temp_buffer.append(s['reactor_temp'])
+        self.comp_buffer.append(s['product_comp_A'])
+        self.level_buffer.append(s['reactor_level'])
+        self.temp_buffer.pop(0)
+        self.comp_buffer.pop(0)
+        self.level_buffer.pop(0)
+
+        # Apply fault
+        if self.active_fault is not None:
+            self._apply_fault()
+
+        self.step_count += 1
+
+        # Compute reward
+        reward, reward_info = self._compute_reward()
+
+        return self._get_state(), reward, reward_info
+
+    def _apply_fault(self):
+        s = self.state
+        t = self.step_count - self.fault_step
+        f = self.active_fault
+
+        if f == 0:  # Feed A loss
+            s['feed_total'] -= 5.0
+        elif f == 1:  # Feed composition drift
+            s['feed_total'] += np.random.normal(0, 0.5)
+        elif f == 2:  # Cooling water fault
+            s['cooling_water_temp'] += 5.0
+        elif f == 3:  # Separator temp drift
+            s['separator_temp'] += 0.1 * t
+        elif f == 4:  # Reactor temp sensor drift
+            s['reactor_temp'] += 0.05 * t
+
+    def _compute_reward(self):
+        s = self.state
+
+        # Product quality
+        comp_A = s['product_comp_A']
+        if comp_A < 0.008:
+            quality = 1.0
+        elif comp_A < 0.012:
+            quality = 0.5 - (comp_A - 0.008) * 100
+        else:
+            quality = max(-2.0, -1.0 - (comp_A - 0.012) * 200)
+
+        # Production rate
+        production = (s['product_flow'] - self.NORM['product_flow']) * 0.1
+
+        # Safety
+        safety = 0.0
+        if s['reactor_temp'] > 140:
+            safety -= (s['reactor_temp'] - 140) * 0.5
+        if s['reactor_pressure'] > 2800:
+            safety -= (s['reactor_pressure'] - 2800) * 0.01
+
+        # Energy
+        energy = -0.01 * abs(s['compressor_work'] - self.NORM['compressor_work'])
+
+        reward = quality + production + safety + energy
+
+        return reward, {
+            'quality_reward': round(quality, 3),
+            'production_reward': round(production, 3),
+            'safety_penalty': round(safety, 3),
+            'energy_penalty': round(energy, 3),
+            'total_reward': round(reward, 3),
+            'product_quality': 'Pass' if comp_A < 0.01 else 'Fail',
+        }
+
+    def get_action(self):
+        """RL-like control policy for web demo."""
+        s = self.state
+        a = {}
+
+        # Feed D: maintain ratio based on reactor temp
+        temp_err = s['reactor_temp'] - self.NORM['reactor_temp']
+        a['feed_D'] = np.clip(15.0 - temp_err * 0.3, 10, 20)
+
+        # Feed E: maintain total feed
+        a['feed_E'] = np.clip(15.0 + temp_err * 0.2, 10, 20)
+
+        # Feed A: adjust for level
+        level_err = s['reactor_level'] - self.NORM['reactor_level']
+        a['feed_A'] = np.clip(22.5 - level_err * 0.5, 15, 30)
+
+        # Recycle valve: maintain separator level
+        sep_err = s['separator_level'] - self.NORM['separator_level']
+        a['recycle_valve'] = np.clip(0.5 - sep_err * 0.02, 0, 1)
+
+        # Purge valve: maintain pressure
+        press_err = s['reactor_pressure'] - self.NORM['reactor_pressure']
+        a['purge_valve'] = np.clip(0.25 + press_err * 0.001, 0, 0.5)
+
+        # Cooling water: control reactor temperature
+        a['cooling_water'] = np.clip(35.0 + temp_err * 0.5, 25, 45)
+
+        return {k: round(v, 3) for k, v in a.items()}
+
+    def _get_state(self):
+        s = self.state
+        safety_status = {}
+        for key, val in s.items():
+            if key == 'reactor_temp':
+                safety_status[key] = {
+                    'value': round(val, 2), 'norm': self.NORM[key],
+                    'min': 80, 'max': 160, 'unit': '°C',
+                    'safe': bool(val < self.SAFETY['reactor_temp_max']),
+                    'warning': bool(val > 140),
+                }
+            elif key == 'reactor_pressure':
+                safety_status[key] = {
+                    'value': round(val, 1), 'norm': self.NORM[key],
+                    'min': 2000, 'max': 3200, 'unit': 'kPa',
+                    'safe': bool(val < self.SAFETY['reactor_press_max']),
+                    'warning': bool(val > 2800),
+                }
+            elif key == 'product_comp_A':
+                safety_status[key] = {
+                    'value': round(val, 5), 'norm': 0.01,
+                    'min': 0, 'max': 0.05, 'unit': 'mol',
+                    'safe': bool(val < 0.01), 'warning': bool(val > 0.008),
+                    'pass': bool(val < 0.01),
+                }
+            else:
+                safety_status[key] = {
+                    'value': round(val, 2), 'norm': self.NORM.get(key, 0),
+                    'unit': '',
+                }
+
+        return {
+            'step': self.step_count,
+            'state': safety_status,
+            'actions': self.actions,
+            'active_fault': self.active_fault,
+            'delay_info': {
+                'temp_buffer': [round(v, 2) for v in self.temp_buffer[-5:]],
+                'comp_buffer': [round(v, 5) for v in self.comp_buffer[-5:]],
+                'transport_delay': 10,
+                'analyzer_delay': 20,
+            },
+        }
+
+    def inject_fault(self, fault_id):
+        self.active_fault = fault_id
+        self.fault_step = self.step_count
+
+    def clear_fault(self):
+        self.active_fault = None
+
+
 simulators = {
     'rule_based': RuleBasedSimulator(),
     'safe_rl': SafeRLSimulator(),
@@ -448,6 +725,7 @@ simulators = {
 }
 
 building_hvac_sim = BuildingHVACSimulator()
+tep_sim = TEPSimulator()
 
 current_simulator = simulators['rule_based']
 
@@ -780,6 +1058,46 @@ def api_building_hvac_step():
     state['comfort_info'] = comfort_info
     state['rl_actions'] = building_hvac_sim.get_action()
     return jsonify(state)
+
+# Tennessee Eastman Process API
+@app.route('/tep-control')
+def tep_control():
+    return render_template('tep_control.html')
+
+@app.route('/api/tep/reset', methods=['POST'])
+def api_tep_reset():
+    global tep_sim
+    state = tep_sim.reset()
+    return jsonify(state)
+
+@app.route('/api/tep/step', methods=['POST'])
+def api_tep_step():
+    global tep_sim
+    data = request.json or {}
+
+    if 'actions' in data:
+        actions = data['actions']
+    else:
+        actions = tep_sim.get_action()
+
+    state, reward, reward_info = tep_sim.step(actions)
+    state['reward'] = round(reward, 3)
+    state['reward_info'] = reward_info
+    state['rl_actions'] = tep_sim.get_action()
+    return jsonify(state)
+
+@app.route('/api/tep/fault', methods=['POST'])
+def api_tep_fault():
+    global tep_sim
+    data = request.json or {}
+    fault_id = data.get('fault_id')
+
+    if fault_id is not None:
+        tep_sim.inject_fault(fault_id)
+        return jsonify({'status': 'fault_injected', 'fault_id': fault_id})
+    else:
+        tep_sim.clear_fault()
+        return jsonify({'status': 'fault_cleared'})
 
 @app.route('/api/pinns/train', methods=['POST'])
 def api_pinns_train():

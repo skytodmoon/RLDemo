@@ -171,9 +171,127 @@
             padding: 8px; margin-top: 6px; font-size: 0.78em; color: #80cbc4; overflow-x: auto;
         }
 
+        /* Evaluation Dashboard */
+        .eval-section {
+            background: rgba(255,255,255,0.06); backdrop-filter: blur(20px);
+            border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 22px;
+            margin-bottom: 18px;
+        }
+        .eval-section h2 { color: #e94560; font-size: 1.2em; margin-bottom: 16px; display: flex; align-items: center; gap: 10px; }
+        .eval-section h2 .refresh-btn {
+            margin-left: auto;
+            padding: 6px 12px;
+            font-size: 0.8em;
+            background: #4caf50;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+        .eval-section h2 .refresh-btn:hover { background: #43a047; }
+        .eval-section h2 .auto-toggle {
+            margin-left: 8px;
+            padding: 4px 10px;
+            font-size: 0.75em;
+            background: #ff9800;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+        .eval-section h2 .auto-toggle.active { background: #4caf50; }
+        
+        .eval-score-card {
+            display: flex;
+            align-items: center;
+            gap: 30px;
+            background: linear-gradient(145deg, rgba(255,255,255,0.08), rgba(255,255,255,0.03));
+            border-radius: 16px;
+            padding: 25px;
+            margin-bottom: 20px;
+        }
+        .eval-overall-score {
+            font-size: 4.5rem;
+            font-weight: bold;
+            background: linear-gradient(90deg, #f093fb 0%, #f5576c 50%, #4facfe 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .eval-grade {
+            font-size: 2rem;
+            font-weight: bold;
+            padding: 8px 24px;
+            border-radius: 40px;
+        }
+        .eval-grade.S { background: linear-gradient(135deg, #11998e, #38ef7d); }
+        .eval-grade.A { background: linear-gradient(135deg, #4facfe, #00f2fe); }
+        .eval-grade.B { background: linear-gradient(135deg, #43e97b, #38f9d7); }
+        .eval-grade.C { background: linear-gradient(135deg, #fa709a, #fee140); }
+        .eval-grade.D { background: linear-gradient(135deg, #ff6b6b, #ee5a5a); }
+        .eval-grade-description { color: #78909c; font-size: 0.95em; margin-top: 8px; }
+        .eval-last-update { font-size: 0.8em; color: #546e7a; }
+        
+        .eval-metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 14px;
+            margin-bottom: 20px;
+        }
+        .eval-metric-card {
+            background: rgba(255,255,255,0.04);
+            border-radius: 10px;
+            padding: 16px;
+            text-align: center;
+        }
+        .eval-metric-icon { font-size: 1.5em; margin-bottom: 6px; }
+        .eval-metric-name { font-size: 0.8em; color: #78909c; margin-bottom: 6px; }
+        .eval-metric-score { font-size: 1.8em; font-weight: bold; }
+        .eval-metric-bar-container { height: 4px; background: rgba(255,255,255,0.1); border-radius: 2px; margin-top: 8px; overflow: hidden; }
+        .eval-metric-bar { height: 100%; border-radius: 2px; transition: width 0.5s; }
+        .eval-metric-bar.excellent { background: linear-gradient(90deg, #11998e, #38ef7d); }
+        .eval-metric-bar.good { background: linear-gradient(90deg, #4facfe, #00f2fe); }
+        .eval-metric-bar.moderate { background: linear-gradient(90deg, #fa709a, #fee140); }
+        .eval-metric-bar.poor { background: linear-gradient(90deg, #ff6b6b, #ee5a5a); }
+        
+        .eval-details-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 14px;
+        }
+        .eval-detail-card {
+            background: rgba(255,255,255,0.04);
+            border-radius: 10px;
+            padding: 16px;
+        }
+        .eval-detail-card h4 { color: #e94560; font-size: 0.95em; margin-bottom: 10px; }
+        .eval-detail-list { list-style: none; padding: 0; }
+        .eval-detail-list li {
+            padding: 6px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.04);
+            font-size: 0.85em;
+            display: flex;
+            justify-content: space-between;
+        }
+        .eval-detail-list li:last-child { border-bottom: none; }
+        .eval-detail-list .label { color: #78909c; }
+        .eval-detail-list .value { font-weight: 600; }
+        .eval-detail-list .value.good { color: #4caf50; }
+        .eval-detail-list .value.warn { color: #ff9800; }
+        .eval-detail-list .value.bad { color: #f44336; }
+        
+        .eval-timer {
+            font-size: 0.8em;
+            color: #546e7a;
+            margin-left: 8px;
+        }
+
         @media (max-width: 900px) {
             .panels-grid, .charts-grid, .arch-grid { grid-template-columns: 1fr; }
             .actions-grid { grid-template-columns: repeat(2, 1fr); }
+            .eval-metrics-grid { grid-template-columns: repeat(2, 1fr); }
+            .eval-details-grid { grid-template-columns: 1fr; }
+            .eval-score-card { flex-direction: column; text-align: center; }
         }
     </style>
 </head>
@@ -245,8 +363,9 @@
         <div class="panel-card">
             <h3>🧪 Product</h3>
             <div class="var-row"><span class="var-name">Flow Rate</span><span class="var-value" id="v-product_flow">--</span><div class="var-bar"><div class="var-bar-fill" id="b-product_flow" style="width:50%;background:#4caf50;"></div></div></div>
-            <div class="var-row"><span class="var-name">Comp A (target &lt;0.01)</span><span class="var-value" id="v-product_comp_A">--</span><div class="var-bar"><div class="var-bar-fill" id="b-product_comp_A" style="width:50%;background:#4caf50;"></div></div></div>
-            <div class="var-row"><span class="var-name">Quality</span><span class="var-value" id="v-quality">--</span></div>
+            <div class="var-row"><span class="var-name">Actual Comp A</span><span class="var-value" id="v-actual_comp_A">--</span><div class="var-bar"><div class="var-bar-fill" id="b-actual_comp_A" style="width:50%;background:#4caf50;"></div></div></div>
+            <div class="var-row"><span class="var-name">Measured (delayed)</span><span class="var-value" id="v-measured_comp_A">--</span></div>
+            <div class="var-row"><span class="var-name">Quality (actual)</span><span class="var-value" id="v-quality">--</span></div>
         </div>
     </div>
 
@@ -302,6 +421,101 @@
     <div class="log-card">
         <h3>📋 Event Log</h3>
         <div class="log-container" id="logContainer"></div>
+    </div>
+
+    <!-- Evaluation Dashboard -->
+    <div class="eval-section">
+        <h2>
+            📊 TEPSAC 控制器效果评估
+            <button class="auto-toggle" id="autoEvalToggle" onclick="toggleAutoEvaluation()">⏱️ 自动评测</button>
+            <span class="eval-timer" id="evalTimer">下次评测: --</span>
+            <button class="refresh-btn" onclick="evaluateNow()">🔄 立即评测</button>
+        </h2>
+        
+        <div class="eval-score-card" id="evalScoreCard">
+            <div>
+                <div class="eval-overall-score" id="evalOverallScore">--</div>
+                <div class="eval-grade-description" id="evalGradeDesc">点击"立即评测"开始评估</div>
+            </div>
+            <div>
+                <div class="eval-grade" id="evalGrade">--</div>
+                <div class="eval-last-update" id="evalLastUpdate">最后更新: --</div>
+            </div>
+        </div>
+        
+        <div class="eval-metrics-grid" id="evalMetricsGrid">
+            <div class="eval-metric-card">
+                <div class="eval-metric-icon">🎯</div>
+                <div class="eval-metric-name">控制性能</div>
+                <div class="eval-metric-score" id="evalControl">--</div>
+                <div class="eval-metric-bar-container"><div class="eval-metric-bar" id="evalControlBar"></div></div>
+            </div>
+            <div class="eval-metric-card">
+                <div class="eval-metric-icon">🧪</div>
+                <div class="eval-metric-name">产品质量</div>
+                <div class="eval-metric-score" id="evalQuality">--</div>
+                <div class="eval-metric-bar-container"><div class="eval-metric-bar" id="evalQualityBar"></div></div>
+            </div>
+            <div class="eval-metric-card">
+                <div class="eval-metric-icon">🛡️</div>
+                <div class="eval-metric-name">安全性</div>
+                <div class="eval-metric-score" id="evalSafety">--</div>
+                <div class="eval-metric-bar-container"><div class="eval-metric-bar" id="evalSafetyBar"></div></div>
+            </div>
+            <div class="eval-metric-card">
+                <div class="eval-metric-icon">⚡</div>
+                <div class="eval-metric-name">能源效率</div>
+                <div class="eval-metric-score" id="evalEfficiency">--</div>
+                <div class="eval-metric-bar-container"><div class="eval-metric-bar" id="evalEfficiencyBar"></div></div>
+            </div>
+            <div class="eval-metric-card">
+                <div class="eval-metric-icon">💰</div>
+                <div class="eval-metric-name">经济效益</div>
+                <div class="eval-metric-score" id="evalEconomic">--</div>
+                <div class="eval-metric-bar-container"><div class="eval-metric-bar" id="evalEconomicBar"></div></div>
+            </div>
+        </div>
+        
+        <div class="eval-details-grid">
+            <div class="eval-detail-card">
+                <h4>🌟 优势分析</h4>
+                <ul class="eval-detail-list" id="evalStrengths">
+                    <li><span class="label">暂无数据</span><span class="value">--</span></li>
+                </ul>
+            </div>
+            <div class="eval-detail-card">
+                <h4>⚠️ 待改进项</h4>
+                <ul class="eval-detail-list" id="evalWeaknesses">
+                    <li><span class="label">暂无数据</span><span class="value">--</span></li>
+                </ul>
+            </div>
+            <div class="eval-detail-card">
+                <h4>💡 优化建议</h4>
+                <ul class="eval-detail-list" id="evalRecommendations">
+                    <li><span class="label">暂无数据</span><span class="value">--</span></li>
+                </ul>
+            </div>
+            <div class="eval-detail-card">
+                <h4>📈 详细指标</h4>
+                <ul class="eval-detail-list" id="evalDetails">
+                    <li><span class="label">跟踪误差</span><span class="value">--</span></li>
+                    <li><span class="label">IAE</span><span class="value">--</span></li>
+                    <li><span class="label">最大超调</span><span class="value">--</span></li>
+                    <li><span class="label">合格率</span><span class="value">--</span></li>
+                </ul>
+            </div>
+        </div>
+        
+        <!-- Optimization Section -->
+        <div class="eval-optimization" id="evalOptimization">
+            <h3 style="color:#e94560;font-size:1.1em;margin-bottom:12px;">⚙️ 智能优化建议</h3>
+            <div id="optimizationContent">
+                <p style="color:#78909c;font-size:0.9em;">点击"应用优化"按钮，系统将根据评估结果自动调整控制器参数。</p>
+            </div>
+            <button class="btn btn-optimize" id="btnOptimize" onclick="applyOptimization()" style="margin-top:12px;padding:10px 24px;background:#4caf50;color:white;border:none;border-radius:8px;cursor:pointer;font-weight:600;display:none;">
+                🚀 应用优化建议
+            </button>
+        </div>
     </div>
 
     <!-- Architecture -->
@@ -560,10 +774,30 @@ function updateVarPanels(state) {
         }
     }
 
-    // Quality badge
+    // Quality badge — use ACTUAL composition for quality assessment
     const qEl = document.getElementById('v-quality');
-    if (qEl && s.product_comp_A) {
-        const pass = s.product_comp_A.pass;
+    const actualCompEl = document.getElementById('v-actual_comp_A');
+    const measuredCompEl = document.getElementById('v-measured_comp_A');
+    const actualCompBar = document.getElementById('b-actual_comp_A');
+
+    if (actualCompEl && state.actual_comp_A !== undefined) {
+        actualCompEl.textContent = state.actual_comp_A.toFixed(4);
+        const actualPass = state.actual_comp_A < 0.01;
+        actualCompEl.className = 'var-value ' + (actualPass ? 'safe' : 'danger');
+        if (actualCompBar) {
+            const pct = Math.max(0, Math.min(100, state.actual_comp_A / 0.05 * 100));
+            actualCompBar.style.width = pct + '%';
+            actualCompBar.style.background = actualPass ? '#4caf50' : '#f44336';
+        }
+    }
+    if (measuredCompEl && state.measured_comp_A !== undefined) {
+        measuredCompEl.textContent = state.measured_comp_A.toFixed(4);
+        const measuredPass = state.measured_comp_A < 0.01;
+        measuredCompEl.className = 'var-value ' + (measuredPass ? 'safe' : 'warn');
+    }
+
+    if (qEl && state.actual_comp_A !== undefined) {
+        const pass = state.actual_comp_A < 0.01;
         qEl.textContent = pass ? '✓ PASS' : '✗ FAIL';
         qEl.className = 'var-value ' + (pass ? 'safe' : 'danger');
     }
@@ -769,10 +1003,264 @@ document.getElementById('speedSlider').addEventListener('input', function() {
 });
 
 // ============================================================
+// Evaluation Functions
+// ============================================================
+let autoEvalEnabled = false;
+let autoEvalTimer = null;
+let autoEvalInterval = 30000; // 30 seconds
+let nextEvalTime = 0;
+
+function getBarClass(score) {
+    if (score >= 80) return 'excellent';
+    if (score >= 60) return 'good';
+    if (score >= 40) return 'moderate';
+    return 'poor';
+}
+
+function getValueClass(score) {
+    if (score >= 80) return 'good';
+    if (score >= 60) return 'warn';
+    return 'bad';
+}
+
+function getGradeClass(grade) {
+    return grade || '';
+}
+
+async function evaluateNow() {
+    try {
+        const btn = document.getElementById('autoEvalToggle');
+        btn.disabled = true;
+        addLog('🔄 正在进行 TEPSAC 控制器评估...', 'info');
+        
+        const resp = await fetch('/api/evaluate_tep_sac');
+        const data = await resp.json();
+        
+        updateEvaluationDisplay(data);
+        
+        const time = new Date().toLocaleTimeString();
+        document.getElementById('evalLastUpdate').textContent = `最后更新: ${time}`;
+        
+        addLog(`✅ 评估完成! 综合评分: ${data.overall_score.toFixed(1)}分 (等级: ${data.overall_grade})`, 'pass');
+        
+        btn.disabled = false;
+    } catch (e) {
+        addLog('❌ 评估失败: ' + e.message, 'error');
+    }
+}
+
+function updateEvaluationDisplay(data) {
+    // Overall score and grade
+    document.getElementById('evalOverallScore').textContent = data.overall_score.toFixed(1);
+    document.getElementById('evalGrade').textContent = data.overall_grade;
+    document.getElementById('evalGrade').className = 'eval-grade ' + getGradeClass(data.overall_grade);
+    document.getElementById('evalGradeDesc').textContent = data.details?.grade_description || '评估完成';
+    
+    // Metrics
+    const metrics = ['control', 'quality', 'safety', 'efficiency', 'economic'];
+    const keys = ['Control', 'Quality', 'Safety', 'Efficiency', 'Economic'];
+    
+    metrics.forEach((metric, index) => {
+        const score = data.scores?.[metric] || 0;
+        document.getElementById(`eval${keys[index]}`).textContent = score.toFixed(1);
+        const bar = document.getElementById(`eval${keys[index]}Bar`);
+        bar.style.width = score + '%';
+        bar.className = 'eval-metric-bar ' + getBarClass(score);
+    });
+    
+    // Strengths
+    const strengthsList = document.getElementById('evalStrengths');
+    strengthsList.innerHTML = '';
+    (data.details?.strong_points || []).forEach(item => {
+        const li = document.createElement('li');
+        const match = item.match(/(\d+\.?\d*)分/);
+        const score = match ? parseFloat(match[1]) : 0;
+        li.innerHTML = `<span class="label">${item.replace(/\s*\(\d+\.?\d*分\)/, '')}</span><span class="value ${getValueClass(score)}">${score}分</span>`;
+        strengthsList.appendChild(li);
+    });
+    if (!data.details?.strong_points?.length) {
+        strengthsList.innerHTML = '<li><span class="label">暂无数据</span><span class="value">--</span></li>';
+    }
+    
+    // Weaknesses
+    const weaknessesList = document.getElementById('evalWeaknesses');
+    weaknessesList.innerHTML = '';
+    (data.details?.weak_points || []).forEach(item => {
+        const li = document.createElement('li');
+        const match = item.match(/(\d+\.?\d*)分/);
+        const score = match ? parseFloat(match[1]) : 0;
+        li.innerHTML = `<span class="label">${item.replace(/\s*\(\d+\.?\d*分\)/, '')}</span><span class="value ${getValueClass(score)}">${score}分</span>`;
+        weaknessesList.appendChild(li);
+    });
+    if (!data.details?.weak_points?.length) {
+        weaknessesList.innerHTML = '<li><span class="label">暂无数据</span><span class="value">--</span></li>';
+    }
+    
+    // Recommendations
+    const recList = document.getElementById('evalRecommendations');
+    recList.innerHTML = '';
+    (data.details?.recommendations || []).forEach((item, idx) => {
+        const li = document.createElement('li');
+        li.innerHTML = `<span class="label">${idx + 1}. ${item}</span><span class="value">💡</span>`;
+        recList.appendChild(li);
+    });
+    if (!data.details?.recommendations?.length) {
+        recList.innerHTML = '<li><span class="label">暂无数据</span><span class="value">--</span></li>';
+    }
+    
+    // Details
+    const detailsList = document.getElementById('evalDetails');
+    detailsList.innerHTML = '';
+    if (data.metrics) {
+        const detailItems = [
+            { label: '跟踪误差', value: data.metrics.control?.tracking_error?.toFixed(4) || '--' },
+            { label: 'IAE', value: data.metrics.control?.iae?.toFixed(2) || '--' },
+            { label: '最大超调', value: (data.metrics.control?.max_overshoot * 100)?.toFixed(1) + '%' || '--' },
+            { label: '合格率', value: (data.metrics.quality?.quality_rate * 100)?.toFixed(1) + '%' || '--' },
+        ];
+        detailItems.forEach(item => {
+            const li = document.createElement('li');
+            li.innerHTML = `<span class="label">${item.label}</span><span class="value">${item.value}</span>`;
+            detailsList.appendChild(li);
+        });
+    }
+    
+    // Optimization suggestions
+    updateOptimizationDisplay(data);
+}
+
+function updateOptimizationDisplay(data) {
+    const content = document.getElementById('optimizationContent');
+    const btn = document.getElementById('btnOptimize');
+    const suggestions = data.details?.optimization_suggestions || [];
+    
+    if (!suggestions || suggestions.length === 0) {
+        content.innerHTML = '<p style="color:#4caf50;font-size:0.9em;">✅ 评估结果优秀，系统运行良好，暂无需优化建议。</p>';
+        btn.style.display = 'none';
+        return;
+    }
+    
+    let html = '<div style="display:grid;gap:12px;">';
+    suggestions.forEach((suggestion, index) => {
+        const priorityColor = suggestion.priority === 'high' ? '#f44336' : suggestion.priority === 'medium' ? '#ff9800' : '#4caf50';
+        const priorityText = suggestion.priority === 'high' ? '高优先级' : suggestion.priority === 'medium' ? '中优先级' : '低优先级';
+        
+        html += `
+            <div style="background:rgba(255,255,255,0.04);border-radius:10px;padding:14px;border-left:3px solid ${priorityColor};">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                    <span style="font-weight:600;color:#fff;">优化策略 #${index + 1}: ${suggestion.strategy}</span>
+                    <span style="font-size:0.75em;color:${priorityColor};">${priorityText}</span>
+                </div>
+                <p style="color:#78909c;font-size:0.85em;margin-bottom:8px;">${suggestion.description}</p>
+                ${suggestion.parameters && Object.keys(suggestion.parameters).length > 0 ? `
+                    <div style="margin-bottom:8px;">
+                        <span style="font-size:0.75em;color:#546e7a;">调整参数:</span>
+                        <div style="font-family:monospace;font-size:0.8em;color:#80cbc4;margin-top:4px;">
+                            ${JSON.stringify(suggestion.parameters, null, 2).replace(/"/g, '')}
+                        </div>
+                    </div>
+                ` : ''}
+                ${suggestion.expected_improvement ? `
+                    <div>
+                        <span style="font-size:0.75em;color:#546e7a;">预期改进:</span>
+                        <div style="font-size:0.8em;color:#4caf50;margin-top:4px;">
+                            ${Object.entries(suggestion.expected_improvement).map(([k, v]) => `${k}: ${v}`).join(', ')}
+                        </div>
+                    </div>
+                ` : ''}
+            </div>
+        `;
+    });
+    html += '</div>';
+    
+    content.innerHTML = html;
+    btn.style.display = 'block';
+}
+
+async function applyOptimization() {
+    try {
+        const btn = document.getElementById('btnOptimize');
+        btn.disabled = true;
+        btn.textContent = '⏳ 应用中...';
+        addLog('⚙️ 正在应用优化建议...', 'info');
+        
+        const resp = await fetch('/api/tep/optimize', { method: 'POST' });
+        const result = await resp.json();
+        
+        if (result.success) {
+            addLog(`✅ 优化成功! 已应用 ${result.applied_count} 项优化`, 'pass');
+            addLog(`📋 修改的参数: ${JSON.stringify(result.parameters_changed)}`, 'info');
+            
+            // Refresh evaluation after optimization
+            setTimeout(() => {
+                evaluateNow();
+            }, 1000);
+        } else {
+            addLog(`❌ 优化失败: ${result.error || '未知错误'}`, 'error');
+        }
+        
+        btn.disabled = false;
+        btn.textContent = '🚀 应用优化建议';
+    } catch (e) {
+        addLog('❌ 优化请求失败: ' + e.message, 'error');
+        const btn = document.getElementById('btnOptimize');
+        btn.disabled = false;
+        btn.textContent = '🚀 应用优化建议';
+    }
+}
+
+function toggleAutoEvaluation() {
+    autoEvalEnabled = !autoEvalEnabled;
+    const btn = document.getElementById('autoEvalToggle');
+    
+    if (autoEvalEnabled) {
+        btn.textContent = '⏱️ 自动评测 (ON)';
+        btn.className = 'auto-toggle active';
+        addLog('🔔 自动评测已启用，每30秒自动评估一次', 'info');
+        nextEvalTime = Date.now() + autoEvalInterval;
+        scheduleAutoEval();
+    } else {
+        btn.textContent = '⏱️ 自动评测';
+        btn.className = 'auto-toggle';
+        if (autoEvalTimer) {
+            clearTimeout(autoEvalTimer);
+            autoEvalTimer = null;
+        }
+        document.getElementById('evalTimer').textContent = '下次评测: --';
+        addLog('🔕 自动评测已禁用', 'info');
+    }
+}
+
+function scheduleAutoEval() {
+    if (!autoEvalEnabled) return;
+    
+    const now = Date.now();
+    const remaining = Math.max(0, nextEvalTime - now);
+    
+    if (remaining <= 0) {
+        evaluateNow();
+        nextEvalTime = Date.now() + autoEvalInterval;
+        scheduleAutoEval();
+    } else {
+        const seconds = Math.ceil(remaining / 1000);
+        document.getElementById('evalTimer').textContent = `下次评测: ${seconds}秒`;
+        
+        autoEvalTimer = setTimeout(() => {
+            scheduleAutoEval();
+        }, 1000);
+    }
+}
+
+// ============================================================
 // Init
 // ============================================================
 drawPFD(null);
 resetSim();
+
+// Initial evaluation after page load
+setTimeout(() => {
+    evaluateNow();
+}, 2000);
 </script>
 </body>
 </html>

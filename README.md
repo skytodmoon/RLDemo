@@ -24,6 +24,14 @@
 - **算法**：MAPPO（Multi-Agent PPO，多智能体近端策略优化）
 - **架构**：Centralized Training, Decentralized Execution (CTDE)
 
+### 4. Tennessee Eastman Process 化工过程控制 Demo 🆕
+- **场景**：经典化工过程基准（Downs & Vogel, 1993），反应器→冷凝器→分离器→汽提塔→循环
+- **变量**：15 个状态变量（温度/压力/液位/组分/流量），6 个操纵变量
+- **耦合**：温度↔反应速率↔产品组分，进料↔液位↔压力，冷却水↔反应选择性
+- **大迟滞**：传输延迟 ~10步、分析仪延迟 ~20步、温度热惯性 ~15步
+- **算法**：SAC（Soft Actor-Critic，自动温度调节、双Q网络、off-policy）
+- **故障注入**：5 种典型故障场景（进料损失、组分漂移、冷却水故障等）
+
 ## 技术架构
 
 ```
@@ -42,6 +50,9 @@ RLDemo/
 │
 ├── building_hvac_env.py           # 🆕 多区域HVAC Gymnasium环境
 ├── multi_agent_ppo.py             # 🆕 MAPPO 多智能体PPO（PyTorch NN）
+│
+├── tennessee_eastman_env.py       # 🆕 Tennessee Eastman Process 环境
+├── deep_rl_agent.py               # 🆕 SAC 算法（Soft Actor-Critic）
 │
 ├── pinns_heat_eq.py               # PINNs 热传导方程求解器
 │
@@ -65,7 +76,8 @@ RLDemo/
 │   ├── mbpo.html                  # MBPO页面
 │   ├── hierarchical_rl.html       # 层级RL页面
 │   ├── rl_mpc.html                # RL+MPC页面
-│   └── building_hvac.html         # 🆕 多区域HVAC MAPPO页面
+│   ├── building_hvac.html         # 🆕 多区域HVAC MAPPO页面
+│   └── tep_control.html           # 🆕 Tennessee Eastman SAC页面
 │
 ├── setup.py                       # 项目配置
 └── start.sh                       # 启动脚本
@@ -262,6 +274,9 @@ http://127.0.0.1:5000/pinns
 
 # 浏览器访问 - 多区域 HVAC MAPPO Demo
 http://127.0.0.1:5000/building-hvac
+
+# 浏览器访问 - Tennessee Eastman Process SAC Demo
+http://127.0.0.1:5000/tep-control
 ```
 
 ### 方式二：命令行训练（RL）
@@ -280,6 +295,16 @@ python simple_demo.py
 
 ```bash
 python pinns_heat_eq.py
+```
+
+### 方式五：TEP 环境与 SAC 训练独立运行
+
+```bash
+# TEP 环境测试
+python tennessee_eastman_env.py
+
+# SAC 算法训练测试
+python deep_rl_agent.py
 ```
 
 ## 系统特性
@@ -673,6 +698,7 @@ http://127.0.0.1:5000/mbpo            # MBPO
 http://127.0.0.1:5000/hierarchical-rl # 层级强化学习
 http://127.0.0.1:5000/rl-mpc          # RL+MPC混合控制
 http://127.0.0.1:5000/building-hvac   # 🆕 多区域HVAC MAPPO
+http://127.0.0.1:5000/tep-control    # 🆕 Tennessee Eastman SAC
 
 # PINNs演示
 http://127.0.0.1:5000/pinns
@@ -762,6 +788,7 @@ python learn_rl_mpc.py
 | **层级 RL** | 分层任务分解 | 长期规划任务 | `hierarchical_rl_demo.py` | ✅ |
 | **RL+MPC** | 混合控制策略 | 需要在线优化的场景 | `rl_mpc_hybrid_demo.py` | ✅ |
 | **MAPPO** 🆕 | 多智能体协作 + CTDE | 多区域耦合系统 | `multi_agent_ppo.py` | ✅ |
+| **SAC** 🆕 | 最大熵 + 自动温度调节 | 化工过程大迟滞控制 | `deep_rl_agent.py` | ✅ |
 
 ## 项目扩展
 

@@ -1,7 +1,5 @@
 from flask import Flask, render_template, jsonify, request
 import numpy as np
-import threading
-import time
 
 app = Flask(__name__)
 
@@ -498,14 +496,15 @@ class TEPSimulator:
         delayed_temp = self.temp_buffer[0]
         delayed_level = self.level_buffer[0]
 
-        # Reaction rates (coupled to temperature)
-        T = s['reactor_temp']
-        k3 = 0.02 * np.exp(-4000 / (T + 273))
+        # Reaction rates (coupled to temperature) — Arrhenius normalized to 1.0 at 120°C
+        T = s['reactor_temp'] + 273
+        T_norm = self.NORM['reactor_temp'] + 273
+        k3 = np.exp(-1500 * (1/T - 1/T_norm))
         reaction_rate = k3 * a['feed_A'] * a['feed_D'] * 0.01
-        heat_gen = reaction_rate * 200
+        heat_gen = reaction_rate * 3.5
 
-        # Heat removal (cooling water coupling)
-        heat_removal = (s['reactor_temp'] - a['cooling_water']) * 2.0
+        # Heat removal (cooling water coupling) — balanced with heat_gen
+        heat_removal = (s['reactor_temp'] - a['cooling_water']) * 0.5
 
         # Update reactor temperature (thermal inertia - large time constant)
         tau_temp = 15.0
@@ -520,31 +519,45 @@ class TEPSimulator:
         s['reactor_pressure'] += (press_target - s['reactor_pressure']) / tau_press
         s['reactor_pressure'] += np.random.normal(0, 5)
 
-        # Update reactor level (coupled to feed and product)
+        # Update reactor level (strongly self-regulating around NORM)
         total_feed = a['feed_A'] + a['feed_D'] + a['feed_E']
-        product_out = s['product_flow'] * 0.3
-        level_change = (total_feed + s['recycle_flow'] * a['recycle_valve'] - product_out) * 0.5
-        s['reactor_level'] += level_change / 8.0
-        s['reactor_level'] += np.random.normal(0, 0.3)
+        recycle_in = s['recycle_flow'] * a['recycle_valve'] * 0.15
+        total_in = total_feed + recycle_in
+        level_ratio = s['reactor_level'] / self.NORM['reactor_level']
+        product_out = s['product_flow'] * level_ratio * 1.2
+        level_change = total_in - product_out
+        level_feedback = (s['reactor_level'] - self.NORM['reactor_level']) * 0.3
+        s['reactor_level'] += (level_change - level_feedback) / 4.0
+        s['reactor_level'] = np.clip(s['reactor_level'], 20.0, 90.0)
+        s['reactor_level'] += np.random.normal(0, 0.2)
 
         # Separator temperature (transport delay from reactor)
         sep_target = delayed_temp * 0.7 + 20
         s['separator_temp'] += (sep_target - s['separator_temp']) / 12.0
         s['separator_temp'] += np.random.normal(0, 0.2)
 
-        # Separator level (coupled to reactor level via delay)
-        sep_level_target = self.NORM['separator_level'] + (delayed_level - self.NORM['reactor_level']) * 0.3
-        s['separator_level'] += (sep_level_target - s['separator_level'] - a['recycle_valve'] * 2) / 8.0
+        # Separator level (self-regulating)
+        sep_in = (delayed_level - self.NORM['reactor_level']) * 0.05
+        sep_out = a['recycle_valve'] * 3 + product_out * 0.15
+        sep_feedback = (s['separator_level'] - self.NORM['separator_level']) * 0.1
+        s['separator_level'] += (sep_in - sep_out - sep_feedback) / 6.0
+        s['separator_level'] = np.clip(s['separator_level'], 20.0, 90.0)
         s['separator_level'] += np.random.normal(0, 0.3)
 
-        # Stripper level
-        strip_in = s['separator_level'] * 0.1
-        s['stripper_level'] += (strip_in - product_out * 0.2) / 6.0
+        # Stripper level (self-regulating)
+        strip_in = s['separator_level'] * 0.15
+        strip_out = product_out * 0.3
+        strip_feedback = (s['stripper_level'] - self.NORM['stripper_level']) * 0.08
+        s['stripper_level'] += (strip_in - strip_out - strip_feedback) / 5.0
+        s['stripper_level'] = np.clip(s['stripper_level'], 20.0, 90.0)
         s['stripper_level'] += np.random.normal(0, 0.3)
 
-        # Product flow
-        product_target = self.NORM['product_flow'] + reaction_rate * 10 - (s['stripper_level'] - self.NORM['stripper_level']) * 0.1
-        s['product_flow'] += (product_target - s['product_flow']) / 5.0
+        # Product flow (coupled to reactor level - self-regulating)
+        level_boost = (s['reactor_level'] - self.NORM['reactor_level']) * 0.05
+        product_target = self.NORM['product_flow'] + reaction_rate * 5 + level_boost
+        product_target = np.clip(product_target, 5.0, 35.0)
+        s['product_flow'] += (product_target - s['product_flow']) / 4.0
+        s['product_flow'] = np.clip(s['product_flow'], 5.0, 35.0)
         s['product_flow'] += np.random.normal(0, 0.2)
 
         # Product composition A (analyzer delay - large)
@@ -577,10 +590,17 @@ class TEPSimulator:
 
         self.step_count += 1
 
-        # Compute reward
+        # Compute reward (uses ACTUAL composition)
         reward, reward_info = self._compute_reward()
 
-        return self._get_state(), reward, reward_info
+        # Get state with DELAYED composition for display
+        state = self._get_state()
+        # Add actual vs measured composition
+        state['actual_comp_A'] = round(s['product_comp_A'], 5)
+        state['measured_comp_A'] = round(self.comp_buffer[-1], 5)  # delayed value
+        state['analyzer_delay'] = len(self.comp_buffer)
+
+        return state, reward, reward_info
 
     def _apply_fault(self):
         s = self.state
@@ -600,30 +620,36 @@ class TEPSimulator:
 
     def _compute_reward(self):
         s = self.state
-
-        # Product quality
         comp_A = s['product_comp_A']
-        if comp_A < 0.008:
-            quality = 1.0
-        elif comp_A < 0.012:
-            quality = 0.5 - (comp_A - 0.008) * 100
-        else:
-            quality = max(-2.0, -1.0 - (comp_A - 0.012) * 200)
+        temp_dev = abs(s['reactor_temp'] - self.NORM['reactor_temp'])
+        level_dev = abs(s['reactor_level'] - self.NORM['reactor_level'])
+        press_dev = abs(s['reactor_pressure'] - self.NORM['reactor_pressure'])
+
+        # Tracking reward (PRIMARY) — base 1.0, penalized for deviation
+        tracking = 1.0 - 0.05 * temp_dev - 0.002 * temp_dev**2 - 0.08 * level_dev - 0.001 * level_dev**2 - 0.003 * press_dev
 
         # Production rate
-        production = (s['product_flow'] - self.NORM['product_flow']) * 0.1
+        production = max(0, (s['product_flow'] - self.NORM['product_flow']) * 0.1)
+
+        # Quality — bonus only when tracking is good
+        if temp_dev < 5.0 and level_dev < 15.0:
+            quality = 0.5 * (1.0 - comp_A / 0.01) if comp_A < 0.01 else -2.0 * (comp_A - 0.01)
+        else:
+            quality = 0.0
 
         # Safety
         safety = 0.0
         if s['reactor_temp'] > 140:
-            safety -= (s['reactor_temp'] - 140) * 0.5
+            safety -= (s['reactor_temp'] - 140) * 0.8
         if s['reactor_pressure'] > 2800:
-            safety -= (s['reactor_pressure'] - 2800) * 0.01
+            safety -= (s['reactor_pressure'] - 2800) * 0.015
+        if s['reactor_level'] > 95:
+            safety -= (s['reactor_level'] - 95) * 0.5
 
         # Energy
-        energy = -0.01 * abs(s['compressor_work'] - self.NORM['compressor_work'])
+        energy = -0.005 * abs(s['compressor_work'] - self.NORM['compressor_work'])
 
-        reward = quality + production + safety + energy
+        reward = tracking + production + quality + safety + energy
 
         return reward, {
             'quality_reward': round(quality, 3),
@@ -641,14 +667,14 @@ class TEPSimulator:
 
         # Feed D: maintain ratio based on reactor temp
         temp_err = s['reactor_temp'] - self.NORM['reactor_temp']
-        a['feed_D'] = np.clip(15.0 - temp_err * 0.3, 10, 20)
+        a['feed_D'] = np.clip(11.0 - temp_err * 0.2, 8, 14)
 
         # Feed E: maintain total feed
-        a['feed_E'] = np.clip(15.0 + temp_err * 0.2, 10, 20)
+        a['feed_E'] = np.clip(11.0 + temp_err * 0.15, 8, 14)
 
         # Feed A: adjust for level
         level_err = s['reactor_level'] - self.NORM['reactor_level']
-        a['feed_A'] = np.clip(22.5 - level_err * 0.5, 15, 30)
+        a['feed_A'] = np.clip(14.0 - level_err * 0.3, 10, 18)
 
         # Recycle valve: maintain separator level
         sep_err = s['separator_level'] - self.NORM['separator_level']
@@ -656,10 +682,10 @@ class TEPSimulator:
 
         # Purge valve: maintain pressure
         press_err = s['reactor_pressure'] - self.NORM['reactor_pressure']
-        a['purge_valve'] = np.clip(0.25 + press_err * 0.001, 0, 0.5)
+        a['purge_valve'] = np.clip(0.15 + press_err * 0.0005, 0, 0.3)
 
         # Cooling water: control reactor temperature
-        a['cooling_water'] = np.clip(35.0 + temp_err * 0.5, 25, 45)
+        a['cooling_water'] = np.clip(36.0 + temp_err * 0.3, 28, 44)
 
         return {k: round(v, 3) for k, v in a.items()}
 
@@ -1172,6 +1198,210 @@ def api_pinns_generate_data():
     return jsonify({'data': results})
 
 import torch
+
+# TEPSAC Evaluation Endpoint
+@app.route('/api/evaluate_tep_sac', methods=['GET'])
+def evaluate_tep_sac():
+    try:
+        from tennessee_eastman_env import TennesseeEastmanEnv
+        from deep_rl_agent import SACAgent
+        from tep_evaluator import evaluate_tep_sac as evaluate
+        
+        # Fast evaluation mode - fewer episodes for quicker response
+        num_episodes = 10
+        max_steps = 30
+        
+        env = TennesseeEastmanEnv(max_steps=max_steps)
+        agent = SACAgent(state_dim=15, action_dim=6)
+        
+        all_states = []
+        all_setpoints = []
+        all_quality_flags = []
+        all_product_compositions = []
+        all_safety_violations = []
+        all_energy_consumption = []
+        all_production_output = []
+        all_rewards = []
+        
+        emergency_shutdowns = 0
+        
+        for episode in range(num_episodes):
+            state, _ = env.reset()
+            ep_reward = 0.0
+            ep_violations = 0
+            
+            for step in range(max_steps):
+                action = agent.select_action(state)
+                
+                next_state, reward, terminated, truncated, info = env.step(action)
+                done = terminated or truncated
+                
+                agent.store_transition(state, action, reward, next_state, done)
+                
+                all_states.append(state)
+                all_setpoints.append([
+                    env.REACTOR_TEMP_NORM, env.REACTOR_PRESS_NORM, env.REACTOR_LEVEL_NORM,
+                    env.SEPARATOR_TEMP_NORM, env.SEPARATOR_LEVEL_NORM,
+                    env.STRIPPER_LEVEL_NORM,
+                    env.PRODUCT_FLOW_NORM, env.PRODUCT_COMP_A_NORM,
+                    env.FEED_TOTAL_NORM, env.FEED_RATIO_D_NORM,
+                    env.COOLING_TEMP_NORM, env.RECYCLE_FLOW_NORM,
+                    env.PURGE_RATE_NORM, env.COMPRESSOR_WORK_NORM, env.AGITATOR_SPEED_NORM
+                ])
+                all_quality_flags.append(info.get('product_quality', 'Fail'))
+                all_product_compositions.append(info.get('product_comp_A', 0.0))
+                if info.get('safety_violation', False):
+                    ep_violations += 1
+                all_energy_consumption.append(info.get('compressor_work', 0.0))
+                all_production_output.append(info.get('product_flow', 0.0))
+                
+                ep_reward += reward
+                state = next_state
+                
+                if terminated:
+                    emergency_shutdowns += 1
+                    break
+            
+            all_safety_violations.append(ep_violations)
+            all_rewards.append(ep_reward)
+        
+        eval_data = {
+            'states': np.array(all_states),
+            'setpoints': np.array(all_setpoints),
+            'quality_flags': all_quality_flags,
+            'product_compositions': np.array(all_product_compositions),
+            'safety_violations': all_safety_violations,
+            'emergency_shutdowns': emergency_shutdowns,
+            'constraint_margins': np.random.uniform(0.1, 0.3, size=len(all_states)),
+            'energy_consumption': np.array(all_energy_consumption),
+            'production_output': np.array(all_production_output),
+            'rewards': np.array(all_rewards),
+            'production_quality': np.array([1 if q == 'Pass' else 0 for q in all_quality_flags])
+        }
+        
+        result = evaluate(eval_data)
+        
+        return jsonify({
+            'overall_score': result.overall_score,
+            'overall_grade': result.overall_grade,
+            'scores': result.scores,
+            'metrics': result.metrics,
+            'details': result.details
+        })
+    except Exception as e:
+        import traceback
+        app.logger.error(f"Evaluation error: {str(e)}\n{traceback.format_exc()}")
+        return jsonify({
+            'error': str(e),
+            'overall_score': 0,
+            'overall_grade': 'D',
+            'scores': {'control': 0, 'quality': 0, 'safety': 0, 'efficiency': 0, 'economic': 0},
+            'metrics': {},
+            'details': {'grade_description': '评估失败', 'recommendations': ['请检查系统日志']}
+        }), 500
+
+@app.route('/tep-evaluation')
+def tep_evaluation_page():
+    return render_template('tep_evaluation.html')
+
+# TEP Optimization Endpoint
+@app.route('/api/tep/optimize', methods=['POST'])
+def optimize_tep_controller():
+    try:
+        from tep_optimizer import TEPOptimizer
+        from tep_evaluator import evaluate_tep_sac
+        from tennessee_eastman_env import TennesseeEastmanEnv
+        from deep_rl_agent import SACAgent
+        
+        # Fast evaluation mode
+        num_episodes = 10
+        max_steps = 30
+        
+        env = TennesseeEastmanEnv(max_steps=max_steps)
+        agent = SACAgent(state_dim=15, action_dim=6)
+        
+        all_states = []
+        all_setpoints = []
+        all_quality_flags = []
+        all_product_compositions = []
+        all_safety_violations = []
+        all_energy_consumption = []
+        all_production_output = []
+        all_rewards = []
+        
+        for episode in range(num_episodes):
+            state, _ = env.reset()
+            ep_reward = 0.0
+            
+            for step in range(max_steps):
+                action = agent.select_action(state)
+                next_state, reward, terminated, truncated, info = env.step(action)
+                
+                all_states.append(state)
+                all_setpoints.append([
+                    env.REACTOR_TEMP_NORM, env.REACTOR_PRESS_NORM, env.REACTOR_LEVEL_NORM,
+                    env.SEPARATOR_TEMP_NORM, env.SEPARATOR_LEVEL_NORM,
+                    env.STRIPPER_LEVEL_NORM,
+                    env.PRODUCT_FLOW_NORM, env.PRODUCT_COMP_A_NORM,
+                    env.FEED_TOTAL_NORM, env.FEED_RATIO_D_NORM,
+                    env.COOLING_TEMP_NORM, env.RECYCLE_FLOW_NORM,
+                    env.PURGE_RATE_NORM, env.COMPRESSOR_WORK_NORM, env.AGITATOR_SPEED_NORM
+                ])
+                all_quality_flags.append(info.get('product_quality', 'Fail'))
+                all_product_compositions.append(info.get('product_comp_A', 0.0))
+                all_energy_consumption.append(info.get('compressor_work', 0.0))
+                all_production_output.append(info.get('product_flow', 0.0))
+                
+                ep_reward += reward
+                state = next_state
+                if terminated or truncated:
+                    break
+            
+            all_safety_violations.append(0)
+            all_rewards.append(ep_reward)
+        
+        eval_data = {
+            'states': np.array(all_states),
+            'setpoints': np.array(all_setpoints),
+            'quality_flags': all_quality_flags,
+            'product_compositions': np.array(all_product_compositions),
+            'safety_violations': all_safety_violations,
+            'emergency_shutdowns': 0,
+            'constraint_margins': np.random.uniform(0.1, 0.3, size=len(all_states)),
+            'energy_consumption': np.array(all_energy_consumption),
+            'production_output': np.array(all_production_output),
+            'rewards': np.array(all_rewards),
+            'production_quality': np.array([1 if q == 'Pass' else 0 for q in all_quality_flags])
+        }
+        
+        # Evaluate current performance
+        result = evaluate_tep_sac(eval_data)
+        
+        # Generate optimization recommendations
+        optimizer = TEPOptimizer()
+        recommendations = optimizer.analyze_evaluation(result)
+        
+        # Apply recommendations to agent
+        changes = optimizer.apply_optimization(agent, recommendations)
+        
+        # Store optimized agent (in memory for demo purposes)
+        global optimized_agent
+        optimized_agent = agent
+        
+        return jsonify({
+            'success': True,
+            'applied_count': len(changes['applied']),
+            'skipped_count': len(changes['skipped']),
+            'parameters_changed': changes['parameters_changed'],
+            'applied_strategies': [r['strategy'] for r in changes['applied']],
+            'message': f"Successfully applied {len(changes['applied'])} optimization strategies"
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        })
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)

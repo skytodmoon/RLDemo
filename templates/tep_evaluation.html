@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TEP SAC 控制器性能评估仪表盘</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            min-height: 100vh;
+            color: #ffffff;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .header p {
+            color: #a0a0a0;
+            font-size: 1.1rem;
+        }
+        
+        /* Score Card */
+        .score-card {
+            background: linear-gradient(145deg, rgba(255,255,255,0.1), rgba(255,255,255,0.05));
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 40px;
+            text-align: center;
+            margin-bottom: 30px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        .overall-score {
+            font-size: 6rem;
+            font-weight: bold;
+            background: linear-gradient(90deg, #f093fb 0%, #f5576c 50%, #4facfe 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 10px;
+        }
+        
+        .overall-grade {
+            font-size: 2.5rem;
+            font-weight: bold;
+            padding: 10px 30px;
+            border-radius: 50px;
+            display: inline-block;
+            margin-bottom: 15px;
+        }
+        
+        .grade-S { background: linear-gradient(135deg, #11998e, #38ef7d); color: white; }
+        .grade-A { background: linear-gradient(135deg, #4facfe, #00f2fe); color: white; }
+        .grade-B { background: linear-gradient(135deg, #43e97b, #38f9d7); color: white; }
+        .grade-C { background: linear-gradient(135deg, #fa709a, #fee140); color: white; }
+        .grade-D { background: linear-gradient(135deg, #ff6b6b, #ee5a5a); color: white; }
+        
+        .grade-description {
+            color: #a0a0a0;
+            font-size: 1.1rem;
+        }
+        
+        /* Metrics Grid */
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .metric-card {
+            background: linear-gradient(145deg, rgba(255,255,255,0.1), rgba(255,255,255,0.05));
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 25px;
+            border: 1px solid rgba(255,255,255,0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        
+        .metric-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+        }
+        
+        .metric-icon {
+            font-size: 2rem;
+            margin-bottom: 10px;
+        }
+        
+        .metric-name {
+            color: #a0a0a0;
+            font-size: 0.9rem;
+            margin-bottom: 10px;
+        }
+        
+        .metric-score {
+            font-size: 3rem;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        
+        .metric-bar-container {
+            height: 8px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 15px;
+        }
+        
+        .metric-bar {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.5s ease;
+        }
+        
+        .bar-S { background: linear-gradient(90deg, #11998e, #38ef7d); }
+        .bar-A { background: linear-gradient(90deg, #4facfe, #00f2fe); }
+        .bar-B { background: linear-gradient(90deg, #43e97b, #38f9d7); }
+        .bar-C { background: linear-gradient(90deg, #fa709a, #fee140); }
+        .bar-D { background: linear-gradient(90deg, #ff6b6b, #ee5a5a); }
+        
+        /* Analysis Section */
+        .analysis-section {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .analysis-card {
+            background: linear-gradient(145deg, rgba(255,255,255,0.1), rgba(255,255,255,0.05));
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 25px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        .analysis-card h3 {
+            font-size: 1.3rem;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .analysis-card ul {
+            list-style: none;
+        }
+        
+        .analysis-card li {
+            padding: 10px 15px;
+            margin-bottom: 10px;
+            border-radius: 8px;
+            font-size: 0.95rem;
+        }
+        
+        .strength-item {
+            background: rgba(76, 175, 80, 0.2);
+            border-left: 4px solid #4caf50;
+        }
+        
+        .weak-item {
+            background: rgba(244, 67, 54, 0.2);
+            border-left: 4px solid #f44336;
+        }
+        
+        .recommendation-item {
+            background: rgba(33, 150, 243, 0.2);
+            border-left: 4px solid #2196f3;
+        }
+        
+        /* Details Table */
+        .details-section {
+            background: linear-gradient(145deg, rgba(255,255,255,0.1), rgba(255,255,255,0.05));
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 25px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        .details-section h3 {
+            font-size: 1.3rem;
+            margin-bottom: 20px;
+        }
+        
+        .details-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        .details-table th, .details-table td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        .details-table th {
+            color: #a0a0a0;
+            font-weight: 500;
+        }
+        
+        .details-table tr:hover {
+            background: rgba(255,255,255,0.05);
+        }
+        
+        /* Refresh Button */
+        .refresh-btn {
+            display: block;
+            width: 200px;
+            margin: 30px auto;
+            padding: 15px 30px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            border-radius: 50px;
+            color: white;
+            font-size: 1.1rem;
+            cursor: pointer;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        
+        .refresh-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+        
+        .refresh-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 50px;
+            font-size: 1.2rem;
+            color: #a0a0a0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📊 TEP SAC 控制器性能评估仪表盘</h1>
+            <p>Tennessee Eastman Process - Soft Actor-Critic Controller Evaluation</p>
+        </div>
+        
+        <div id="content">
+            <div class="loading">
+                <div style="font-size: 3rem; margin-bottom: 20px;">🔄</div>
+                <p>正在运行评估测试，请稍候...</p>
+            </div>
+        </div>
+        
+        <button class="refresh-btn" id="refreshBtn" onclick="runEvaluation()">
+            🔄 重新评估
+        </button>
+    </div>
+    
+    <script>
+        function getGrade(score) {
+            if (score >= 90) return 'S';
+            if (score >= 80) return 'A';
+            if (score >= 70) return 'B';
+            if (score >= 60) return 'C';
+            return 'D';
+        }
+        
+        function getGradeColor(score) {
+            const grade = getGrade(score);
+            return grade;
+        }
+        
+        function formatNumber(num, decimals = 1) {
+            return num.toFixed(decimals);
+        }
+        
+        function renderResult(data) {
+            const content = document.getElementById('content');
+            
+            content.innerHTML = `
+                <div class="score-card">
+                    <div class="overall-score">${formatNumber(data.overall_score)}</div>
+                    <div class="overall-grade grade-${data.overall_grade}">${data.overall_grade}</div>
+                    <div class="grade-description">${data.details.grade_description}</div>
+                </div>
+                
+                <div class="metrics-grid">
+                    <div class="metric-card">
+                        <div class="metric-icon">🎯</div>
+                        <div class="metric-name">控制性能</div>
+                        <div class="metric-score" style="color: #${getGradeColor(data.scores.control) === 'S' ? '11998e' : getGradeColor(data.scores.control) === 'A' ? '4facfe' : getGradeColor(data.scores.control) === 'B' ? '43e97b' : getGradeColor(data.scores.control) === 'C' ? 'fa709a' : 'ff6b6b'}">${formatNumber(data.scores.control)}</div>
+                        <div class="metric-bar-container">
+                            <div class="metric-bar bar-${getGradeColor(data.scores.control)}" style="width: ${data.scores.control}%"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="metric-card">
+                        <div class="metric-icon">✅</div>
+                        <div class="metric-name">产品质量</div>
+                        <div class="metric-score" style="color: #${getGradeColor(data.scores.quality) === 'S' ? '11998e' : getGradeColor(data.scores.quality) === 'A' ? '4facfe' : getGradeColor(data.scores.quality) === 'B' ? '43e97b' : getGradeColor(data.scores.quality) === 'C' ? 'fa709a' : 'ff6b6b'}">${formatNumber(data.scores.quality)}</div>
+                        <div class="metric-bar-container">
+                            <div class="metric-bar bar-${getGradeColor(data.scores.quality)}" style="width: ${data.scores.quality}%"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="metric-card">
+                        <div class="metric-icon">🛡️</div>
+                        <div class="metric-name">安全性</div>
+                        <div class="metric-score" style="color: #${getGradeColor(data.scores.safety) === 'S' ? '11998e' : getGradeColor(data.scores.safety) === 'A' ? '4facfe' : getGradeColor(data.scores.safety) === 'B' ? '43e97b' : getGradeColor(data.scores.safety) === 'C' ? 'fa709a' : 'ff6b6b'}">${formatNumber(data.scores.safety)}</div>
+                        <div class="metric-bar-container">
+                            <div class="metric-bar bar-${getGradeColor(data.scores.safety)}" style="width: ${data.scores.safety}%"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="metric-card">
+                        <div class="metric-icon">⚡</div>
+                        <div class="metric-name">能源效率</div>
+                        <div class="metric-score" style="color: #${getGradeColor(data.scores.efficiency) === 'S' ? '11998e' : getGradeColor(data.scores.efficiency) === 'A' ? '4facfe' : getGradeColor(data.scores.efficiency) === 'B' ? '43e97b' : getGradeColor(data.scores.efficiency) === 'C' ? 'fa709a' : 'ff6b6b'}">${formatNumber(data.scores.efficiency)}</div>
+                        <div class="metric-bar-container">
+                            <div class="metric-bar bar-${getGradeColor(data.scores.efficiency)}" style="width: ${data.scores.efficiency}%"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="metric-card">
+                        <div class="metric-icon">💰</div>
+                        <div class="metric-name">经济效益</div>
+                        <div class="metric-score" style="color: #${getGradeColor(data.scores.economic) === 'S' ? '11998e' : getGradeColor(data.scores.economic) === 'A' ? '4facfe' : getGradeColor(data.scores.economic) === 'B' ? '43e97b' : getGradeColor(data.scores.economic) === 'C' ? 'fa709a' : 'ff6b6b'}">${formatNumber(data.scores.economic)}</div>
+                        <div class="metric-bar-container">
+                            <div class="metric-bar bar-${getGradeColor(data.scores.economic)}" style="width: ${data.scores.economic}%"></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="analysis-section">
+                    <div class="analysis-card">
+                        <h3>⭐ 优势分析</h3>
+                        <ul>
+                            ${data.details.strong_points.length > 0 
+                                ? data.details.strong_points.map(p => `<li class="strength-item">${p}</li>`).join('') 
+                                : '<li style="color: #a0a0a0;">暂无突出优势</li>'}
+                        </ul>
+                    </div>
+                    
+                    <div class="analysis-card">
+                        <h3>⚠️ 待改进项</h3>
+                        <ul>
+                            ${data.details.weak_points.length > 0 
+                                ? data.details.weak_points.map(p => `<li class="weak-item">${p}</li>`).join('') 
+                                : '<li style="color: #a0a0a0;">暂无明显短板</li>'}
+                        </ul>
+                    </div>
+                    
+                    <div class="analysis-card">
+                        <h3>💡 优化建议</h3>
+                        <ul>
+                            ${data.details.recommendations.length > 0 
+                                ? data.details.recommendations.map(r => `<li class="recommendation-item">${r}</li>`).join('') 
+                                : '<li style="color: #a0a0a0;">暂无建议</li>'}
+                        </ul>
+                    </div>
+                </div>
+                
+                <div class="details-section">
+                    <h3>📋 详细指标</h3>
+                    <table class="details-table">
+                        <thead>
+                            <tr>
+                                <th>指标类别</th>
+                                <th>具体指标</th>
+                                <th>数值</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr><td rowspan="4">控制性能</td><td>跟踪误差</td><td>${formatNumber(data.metrics.control.tracking_error, 4)}</td></tr>
+                            <tr><td>积分绝对误差</td><td>${formatNumber(data.metrics.control.iae, 2)}</td></tr>
+                            <tr><td>最大超调</td><td>${formatNumber(data.metrics.control.max_overshoot, 4)}</td></tr>
+                            <tr><td>稳定性裕度</td><td>${formatNumber(data.metrics.control.stability_margin, 3)}</td></tr>
+                            
+                            <tr><td rowspan="3">产品质量</td><td>合格率</td><td>${formatNumber(data.metrics.quality.quality_rate * 100, 1)}%</td></tr>
+                            <tr><td>平均成分A</td><td>${formatNumber(data.metrics.quality.avg_composition_A, 5)}</td></tr>
+                            <tr><td>成分标准差</td><td>${formatNumber(data.metrics.quality.composition_std, 5)}</td></tr>
+                            
+                            <tr><td rowspan="2">安全性</td><td>总违规次数</td><td>${data.metrics.safety.total_violations}</td></tr>
+                            <tr><td>紧急停机次数</td><td>${data.metrics.safety.emergency_shutdowns}</td></tr>
+                            
+                            <tr><td rowspan="3">能源效率</td><td>平均能耗</td><td>${formatNumber(data.metrics.efficiency.avg_energy, 1)} kW</td></tr>
+                            <tr><td>平均产量</td><td>${formatNumber(data.metrics.efficiency.avg_production, 1)} m³/h</td></tr>
+                            <tr><td>单位能耗</td><td>${formatNumber(data.metrics.efficiency.energy_per_unit, 2)}</td></tr>
+                            
+                            <tr><td rowspan="2">经济效益</td><td>平均奖励</td><td>${formatNumber(data.metrics.economic.avg_reward, 2)}</td></tr>
+                            <tr><td>奖励标准差</td><td>${formatNumber(data.metrics.economic.reward_std, 2)}</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            `;
+        }
+        
+        async function runEvaluation() {
+            const btn = document.getElementById('refreshBtn');
+            const content = document.getElementById('content');
+            
+            btn.disabled = true;
+            btn.innerHTML = '⏳ 评估中...';
+            
+            content.innerHTML = `
+                <div class="loading">
+                    <div style="font-size: 3rem; margin-bottom: 20px;">🔄</div>
+                    <p>正在运行 TEPSAC 评估测试，请稍候...</p>
+                    <p style="font-size: 0.9rem; color: #666; margin-top: 10px;">预计需要 1-2 分钟</p>
+                </div>
+            `;
+            
+            try {
+                const response = await fetch('/api/evaluate_tep_sac');
+                const data = await response.json();
+                renderResult(data);
+            } catch (error) {
+                content.innerHTML = `
+                    <div style="text-align: center; padding: 50px; color: #ff6b6b;">
+                        <div style="font-size: 3rem; margin-bottom: 20px;">❌</div>
+                        <p>评估失败: ${error.message}</p>
+                    </div>
+                `;
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '🔄 重新评估';
+            }
+        }
+        
+        // Run evaluation on page load
+        document.addEventListener('DOMContentLoaded', runEvaluation);
+    </script>
+</body>
+</html>

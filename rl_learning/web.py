@@ -1,6 +1,6 @@
 """Bounded, local teaching experiments for the existing Flask application."""
 
-from flask import Blueprint, jsonify, render_template, request
+from flask import Blueprint, current_app, jsonify, render_template, request
 
 from .curriculum import FAST_LABS, LESSONS
 from .experiments import run_lab
@@ -28,6 +28,10 @@ def run():
         return jsonify(error="请选择基础实验；神经网络训练请使用页面上的 CLI 命令"), 400
     if isinstance(seed, bool) or not isinstance(seed, int) or not 0 <= seed < 2**32:
         return jsonify(error="seed 必须是 [0, 2**32) 内的整数"), 400
-    result = run_lab(name, seeds=[seed])
-    return jsonify(result=result, passed=all(result["checks"].values()),
-                   note="单种子课堂实验；多种子与独立评估请运行 CLI 验证。")
+    try:
+        result = run_lab(name, seeds=[seed])
+        return jsonify(result=result, passed=all(result["checks"].values()),
+                       note="单种子课堂实验；多种子与独立评估请运行 CLI 验证。")
+    except Exception:
+        current_app.logger.exception("Learning experiment failed: lab=%s seed=%s", name, seed)
+        return jsonify(error="实验计算失败，请重试；若重复失败，请检查服务日志", lab=name, seed=seed), 500

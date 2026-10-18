@@ -7,11 +7,15 @@
 ```bash
 python -m pip install -r requirements-dev.txt
 python -m pytest -q
+# 前端请求回归（Node.js 22，无额外 npm 依赖）
+node --test tests/js/*.test.cjs
 ```
 
 `pytest.ini` 只收集 `tests/`。根目录的 `test_algorithms.py`、`test_hvac.py`、`test_tep_sac.py` 是历史演示/训练脚本，不能作为验收测试。若复用已有 Python 环境且第三方 pytest 插件版本冲突，可用 `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q` 隔离无关插件；推荐独立虚拟环境。
 
 回归检查包括：环境种子隔离、温控时间上限、安全过滤方向、裁剪前违规、解析 MDP 价值、相同预算下的 Dyna 更新、报告失败保留、MAPPO 概率比与 GAE、模型动作编码、规划动作索引、策略梯度实际改变动作概率、SAC 截断自举，以及 TEP 评估不修改策略。
+
+页面回归检查覆盖全部六类基础实验的 JSON 响应，以及每个运行按钮与本课结果区域的对应关系。结果、指标和错误直接显示在按钮下方，不覆盖其他章节的结果。前端请求测试覆盖非 JSON 错误页、结果格式错误、断网后重试、30 秒超时和并发请求乱序返回。后台计算或序列化失败时返回 JSON 错误并记录日志，不将异常当成科学实验的 FAIL 判定。
 
 ## 可复现的性能验证
 

@@ -22,7 +22,12 @@
         button { background:var(--accent); color:#0b2924; cursor:pointer; font-weight:600; }
         button:disabled { opacity:.5; cursor:wait; } .read { background:transparent; color:var(--ink); margin-top:12px; }
         .commands { margin-top:14px; } .controls { display:flex; gap:12px; flex-wrap:wrap; align-items:center; }
-        #result { min-height:120px; } .pass { color:#89e2c9; } .fail { color:#ffb4a9; }
+        .lab-result { margin-top:14px; padding-top:14px; border-top:1px solid var(--line); overflow-wrap:anywhere; }
+        .lab-result[hidden] { display:none; }
+        .lab-result .result-title { margin:0 0 10px; font-weight:600; }
+        .metrics-scroll { overflow-x:auto; margin-bottom:12px; }
+        .metrics-scroll table { font-size:14px; }
+        .pass { color:#89e2c9; } .fail { color:#ffb4a9; }
         table { width:100%; border-collapse:collapse; } td,th { text-align:left; padding:8px; border-bottom:1px solid var(--line); }
         details { margin:12px 0; } summary { cursor:pointer; } #progress { color:var(--accent); }
         @media(max-width:600px) { h1 { font-size:28px; } main { padding:20px 16px; } .grid { grid-template-columns:1fr; } }
@@ -36,12 +41,12 @@
     <div class="panel">
         <div class="controls"><label for="seed">实验种子</label><input id="seed" type="number" min="0" max="4294967295" value="0" style="width:140px"><span id="progress" aria-live="polite"></span></div>
         <p class="muted">基础实验在本机运行。这里的“已阅读”只记录阅读进度；实验通过只代表所列条件满足，不能代替对整章知识的掌握。</p>
-        <div id="result" role="status" aria-live="polite">选择一课的“运行实验”，查看实际计算结果。</div>
+        <p>点击任意章节的“运行实验”，运行状态、指标和检查结果会直接显示在该按钮下方。</p>
     </div>
     <h2>12 课的学习与代码对应关系</h2>
     <div class="grid">
     {% for lesson in lessons %}
-        <article>
+        <article id="lesson-{{ lesson.lesson }}">
             <span class="badge">第 {{ lesson.lesson }} 课 · {{ {'automated':'基础机制可自动验证','partial':'部分机制已验证，其余需扩展','guided':'阅读与研究练习'}[lesson.coverage] }}</span>
             <h3>{{ lesson.title }}</h3>
             <p>{{ lesson.question }}</p>
@@ -50,7 +55,8 @@
                 {% for file in lesson.files %}<div><code>{{ file }}</code></div>{% endfor %}
             </details>
             {% if lesson.lab in labs %}
-                <button type="button" data-lab="{{ lesson.lab }}">运行 {{ lesson.lab }} 实验</button>
+                <button type="button" data-lab="{{ lesson.lab }}" aria-controls="lesson-result-{{ lesson.lesson }}" aria-expanded="false">运行 {{ lesson.lab }} 实验</button>
+                <div id="lesson-result-{{ lesson.lesson }}" class="lab-result" role="status" aria-live="polite" hidden></div>
             {% elif lesson.lab == 'deep' %}
                 <div class="commands">在项目终端运行：<pre>python -m rl_learning run --lab deep --algorithm {{ lesson.algorithm }} --seeds 0 1 2 --timesteps 40000 --eval-seed-base 20000 --output results/{{ lesson.algorithm }}</pre></div>
             {% else %}<p class="muted">请按代码与练习设计留出实验，当前没有自动通过判定。</p>{% endif %}
@@ -63,8 +69,8 @@
     <pre>python -m rl_learning verify --include-deep --algorithms ppo dqn a2c reinforce --seeds 0 1 2 --timesteps 40000 --eval-seed-base 20000 --output results/full</pre>
     <p class="muted">查看 report.md 中的 PASS/FAIL，再分析 learning_curves.csv 与 evaluation.csv。失败同样是实验结果。规则基线可能优于训练策略；L9 不确定性、TRPO、MCTS、RND、NGU 和真实工业验证仍需独立实验。</p>
 </main>
+<script src="{{ url_for('static', filename='learning_request.js') }}"></script>
 <script>
-    const output = document.querySelector('#result');
     const runButtons = [...document.querySelectorAll('[data-lab]')];
     let read = new Set();
     try { const saved = JSON.parse(localStorage.getItem('rldemo-read-lessons') || '[]'); if (Array.isArray(saved)) read = new Set(saved.filter(n => Number.isInteger(n) && n >= 1 && n <= 12)); } catch (_) {}
@@ -82,28 +88,88 @@
         try { localStorage.setItem('rldemo-read-lessons', JSON.stringify([...read])); } catch (_) {}
         updateProgress();
     }));
+    const checkLabels = {
+        matches_analytic_value:'与解析价值一致', vi_pi_agree:'价值迭代与策略迭代一致',
+        bellman_residual_small:'Bellman 残差达到阈值', mc_matches_random_walk_oracle:'MC 预测误差达到阈值',
+        td_matches_random_walk_oracle:'TD 预测误差达到阈值', all_policies_reach_goal:'所有策略到达目标',
+        all_policies_use_shortest_path:'所有策略使用最短路径', all_policies_beat_random:'回报优于随机基线',
+        all_strategies_prefer_best_arm:'探索策略偏好最优动作', regret_below_uniform_expectation:'伪遗憾低于随机期望'
+    };
+    const algorithmLabels = {q_learning:'Q-learning', sarsa:'SARSA', dyna_q:'Dyna-Q',
+        no_bonus:'无计数奖励', count_bonus:'计数奖励', epsilon_greedy:'ε-greedy', ucb:'UCB', thompson:'Thompson'};
+    function number(value, digits=3) {
+        return typeof value === 'number' && Number.isFinite(value) ? value.toFixed(digits) : '未提供';
+    }
+    function appendText(parent, text, className='') {
+        const line = document.createElement('div'); line.textContent = text; line.className = className;
+        parent.append(line);
+    }
+    function appendTable(parent, headers, rows) {
+        const scroll = document.createElement('div'); scroll.className = 'metrics-scroll';
+        const table = document.createElement('table'); const head = document.createElement('thead');
+        const header = document.createElement('tr');
+        headers.forEach(text => { const th = document.createElement('th'); th.scope = 'col'; th.textContent = text; header.append(th); });
+        head.append(header); table.append(head); const body = document.createElement('tbody');
+        rows.forEach(values => { const row = document.createElement('tr'); values.forEach(text => { const td = document.createElement('td'); td.textContent = text; row.append(td); }); body.append(row); });
+        table.append(body); scroll.append(table); parent.append(scroll);
+    }
+    function renderResult(output, data, seed) {
+        const result = data.result;
+        output.replaceChildren();
+        appendText(output, `${data.passed ? 'PASS · 检查通过' : 'FAIL · 有检查未通过'} · ${result.lab} · seed ${seed}`, `result-title ${data.passed ? 'pass' : 'fail'}`);
+        if (result.lab === 'dp') {
+            const m = result.metrics;
+            appendTable(output, ['指标', '数值'], [
+                ['价值迭代 V(起点)', number(m.vi_start_value)], ['策略迭代 V(起点)', number(m.pi_start_value)],
+                ['解析价值', number(m.analytic_start_value)], ['Bellman 残差', m.bellman_residual.toExponential(2)]
+            ]);
+        } else if (result.lab === 'prediction') {
+            appendTable(output, ['种子', 'MC RMSE', 'TD RMSE'], result.runs.map(run => [run.seed, number(run.mc_rmse), number(run.td_rmse)]));
+        } else if (result.lab === 'bandit') {
+            appendTable(output, ['算法', '伪遗憾', '最优动作比例'], result.runs.map(run => [
+                algorithmLabels[run.strategy] || run.strategy, number(run.pseudo_regret, 2), `${number(run.optimal_action_rate * 100, 1)}%`
+            ]));
+        } else {
+            appendTable(output, ['算法', '成功率', '步数', '回报'], result.runs.map(run => [
+                algorithmLabels[run.algorithm] || run.algorithm, `${number(run.evaluation.success_rate * 100, 0)}%`,
+                number(run.evaluation.steps_mean, 0), number(run.evaluation.return_mean, 1)
+            ]));
+            result.runs.forEach(run => appendText(output,
+                `${algorithmLabels[run.algorithm] || run.algorithm}：真实交互 ${run.real_steps} 次，规划更新 ${run.planning_updates} 次，访问 ${run.visited_pairs} 个状态动作对。`, 'muted'));
+        }
+        for (const [check, passed] of Object.entries(result.checks)) {
+            appendText(output, `${passed ? '✓' : '✗'} ${checkLabels[check] || check}`, passed ? 'pass' : 'fail');
+        }
+        const detail = document.createElement('details'); const summary = document.createElement('summary');
+        summary.textContent = '查看指标与学习曲线原始数据';
+        const pre = document.createElement('pre');
+        detail.addEventListener('toggle', () => { if (detail.open && !pre.textContent) pre.textContent = JSON.stringify(result, null, 2); });
+        detail.append(summary, pre); output.append(detail);
+        if (result.interpretation) appendText(output, result.interpretation, 'muted');
+        appendText(output, data.note || '单种子课堂实验；多种子与独立评估请运行 CLI 验证。', 'muted');
+    }
     runButtons.forEach(button => button.addEventListener('click', async () => {
+        const output = document.getElementById(button.getAttribute('aria-controls'));
+        output.hidden = false;
+        button.setAttribute('aria-expanded', 'true');
         const seedText = document.querySelector('#seed').value.trim();
         const seed = Number(seedText);
-        if (seedText === '' || !Number.isInteger(seed) || seed < 0 || seed >= 2**32) { output.textContent = '请输入有效的非负整数种子。'; return; }
-        runButtons.forEach(b => b.disabled = true);
+        if (seedText === '' || !Number.isInteger(seed) || seed < 0 || seed >= 2**32) {
+            output.replaceChildren(); appendText(output, '请输入 0–4294967295 内的整数种子后重试。', 'fail');
+            output.scrollIntoView({block:'nearest', behavior:'smooth'}); return;
+        }
+        const label = button.textContent;
+        button.disabled = true; button.textContent = '计算中…'; output.setAttribute('aria-busy', 'true');
         output.textContent = `正在运行 ${button.dataset.lab}，使用种子 ${seed} …`;
+        output.scrollIntoView({block:'nearest', behavior:'smooth'});
         try {
-            const response = await fetch('/api/learning/run', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({lab:button.dataset.lab, seed})});
-            const data = await response.json();
-            if (!response.ok) throw new Error(data.error || '实验请求失败');
-            output.replaceChildren();
-            const title = document.createElement('p');
-            title.textContent = `${data.passed ? 'PASS' : 'FAIL'} · ${data.result.lab} · seed ${seed}`;
-            title.className = data.passed ? 'pass' : 'fail'; output.append(title);
-            for (const [check, passed] of Object.entries(data.result.checks)) {
-                const row = document.createElement('div'); row.textContent = `${passed ? '✓' : '✗'} ${check}`; output.append(row);
-            }
-            const detail = document.createElement('details'); const summary = document.createElement('summary'); summary.textContent = '查看指标与学习曲线原始数据';
-            const pre = document.createElement('pre'); pre.textContent = JSON.stringify(data.result, null, 2); detail.append(summary, pre); output.append(detail);
-            const note = document.createElement('p'); note.className = 'muted'; note.textContent = data.note; output.append(note);
-        } catch (error) { output.textContent = error.message; }
-        finally { runButtons.forEach(b => b.disabled = false); }
+            const data = await RLLearningRequest.requestLab({lab:button.dataset.lab, seed});
+            renderResult(output, data, seed);
+        } catch (error) {
+            output.replaceChildren(); appendText(output, `${error.message} 可再次点击“运行实验”重试。`, 'fail');
+        } finally {
+            button.disabled = false; button.textContent = label; output.setAttribute('aria-busy', 'false');
+        }
     }));
     updateProgress();
 </script>

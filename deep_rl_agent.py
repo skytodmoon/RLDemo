@@ -260,7 +260,7 @@ class SACAgent:
             return action.cpu().numpy().flatten()
 
     def store_transition(self, state, action, reward, next_state, done):
-        """Store transition in replay buffer."""
+        """Store transition; ``done`` must mean true termination, not a time limit."""
         self.replay_buffer.add(state, action, reward, next_state, done)
 
     def update(self) -> Dict[str, float]:
@@ -423,7 +423,7 @@ def train_sac(num_episodes: int = 200, max_steps: int = 500,
             done = terminated or truncated
 
             # Store transition
-            agent.store_transition(state, action, reward, next_state, done)
+            agent.store_transition(state, action, reward, next_state, terminated)
 
             # Update agent
             if total_steps >= warmup_steps and total_steps % update_every == 0:

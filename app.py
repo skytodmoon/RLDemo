@@ -2,6 +2,9 @@ from flask import Flask, render_template, jsonify, request
 import numpy as np
 
 app = Flask(__name__)
+from rl_learning.web import learning
+app.register_blueprint(learning)
+app.config.setdefault('TEP_SAC_CHECKPOINT', 'sac_tep_model.pt')
 
 class BaseSimulator:
     def __init__(self):
@@ -1127,6 +1130,7 @@ def api_tep_fault():
 
 @app.route('/api/pinns/train', methods=['POST'])
 def api_pinns_train():
+    import torch
     global pinns_history
     epochs = request.json.get('epochs', 1000)
     
@@ -1197,211 +1201,42 @@ def api_pinns_generate_data():
     
     return jsonify({'data': results})
 
-import torch
-
-# TEPSAC Evaluation Endpoint
+# Evaluate a saved policy, without replay updates or synthetic safety margins.
 @app.route('/api/evaluate_tep_sac', methods=['GET'])
 def evaluate_tep_sac():
+    from rl_learning.industrial_evaluation import evaluate_tep_checkpoint
     try:
-        from tennessee_eastman_env import TennesseeEastmanEnv
-        from deep_rl_agent import SACAgent
-        from tep_evaluator import evaluate_tep_sac as evaluate
-        
-        # Fast evaluation mode - fewer episodes for quicker response
-        num_episodes = 10
-        max_steps = 30
-        
-        env = TennesseeEastmanEnv(max_steps=max_steps)
-        agent = SACAgent(state_dim=15, action_dim=6)
-        
-        all_states = []
-        all_setpoints = []
-        all_quality_flags = []
-        all_product_compositions = []
-        all_safety_violations = []
-        all_energy_consumption = []
-        all_production_output = []
-        all_rewards = []
-        
-        emergency_shutdowns = 0
-        
-        for episode in range(num_episodes):
-            state, _ = env.reset()
-            ep_reward = 0.0
-            ep_violations = 0
-            
-            for step in range(max_steps):
-                action = agent.select_action(state)
-                
-                next_state, reward, terminated, truncated, info = env.step(action)
-                done = terminated or truncated
-                
-                agent.store_transition(state, action, reward, next_state, done)
-                
-                all_states.append(state)
-                all_setpoints.append([
-                    env.REACTOR_TEMP_NORM, env.REACTOR_PRESS_NORM, env.REACTOR_LEVEL_NORM,
-                    env.SEPARATOR_TEMP_NORM, env.SEPARATOR_LEVEL_NORM,
-                    env.STRIPPER_LEVEL_NORM,
-                    env.PRODUCT_FLOW_NORM, env.PRODUCT_COMP_A_NORM,
-                    env.FEED_TOTAL_NORM, env.FEED_RATIO_D_NORM,
-                    env.COOLING_TEMP_NORM, env.RECYCLE_FLOW_NORM,
-                    env.PURGE_RATE_NORM, env.COMPRESSOR_WORK_NORM, env.AGITATOR_SPEED_NORM
-                ])
-                all_quality_flags.append(info.get('product_quality', 'Fail'))
-                all_product_compositions.append(info.get('product_comp_A', 0.0))
-                if info.get('safety_violation', False):
-                    ep_violations += 1
-                all_energy_consumption.append(info.get('compressor_work', 0.0))
-                all_production_output.append(info.get('product_flow', 0.0))
-                
-                ep_reward += reward
-                state = next_state
-                
-                if terminated:
-                    emergency_shutdowns += 1
-                    break
-            
-            all_safety_violations.append(ep_violations)
-            all_rewards.append(ep_reward)
-        
-        eval_data = {
-            'states': np.array(all_states),
-            'setpoints': np.array(all_setpoints),
-            'quality_flags': all_quality_flags,
-            'product_compositions': np.array(all_product_compositions),
-            'safety_violations': all_safety_violations,
-            'emergency_shutdowns': emergency_shutdowns,
-            'constraint_margins': np.random.uniform(0.1, 0.3, size=len(all_states)),
-            'energy_consumption': np.array(all_energy_consumption),
-            'production_output': np.array(all_production_output),
-            'rewards': np.array(all_rewards),
-            'production_quality': np.array([1 if q == 'Pass' else 0 for q in all_quality_flags])
-        }
-        
-        result = evaluate(eval_data)
-        
-        return jsonify({
-            'overall_score': result.overall_score,
-            'overall_grade': result.overall_grade,
-            'scores': result.scores,
-            'metrics': result.metrics,
-            'details': result.details
-        })
-    except Exception as e:
-        import traceback
-        app.logger.error(f"Evaluation error: {str(e)}\n{traceback.format_exc()}")
-        return jsonify({
-            'error': str(e),
-            'overall_score': 0,
-            'overall_grade': 'D',
-            'scores': {'control': 0, 'quality': 0, 'safety': 0, 'efficiency': 0, 'economic': 0},
-            'metrics': {},
-            'details': {'grade_description': '评估失败', 'recommendations': ['请检查系统日志']}
-        }), 500
+        result, _ = evaluate_tep_checkpoint(app.config['TEP_SAC_CHECKPOINT'])
+        return jsonify(overall_score=result.overall_score, overall_grade=result.overall_grade,
+                       scores=result.scores, metrics=result.metrics, details=result.details,
+                       policy_source='frozen_checkpoint', checkpoint=app.config['TEP_SAC_CHECKPOINT'])
+    except FileNotFoundError as error:
+        return jsonify(error=str(error), status='checkpoint_required'), 409
+    except Exception:
+        app.logger.exception('TEP evaluation failed')
+        return jsonify(error='TEP 评估失败，请查看服务日志'), 500
 
 @app.route('/tep-evaluation')
 def tep_evaluation_page():
     return render_template('tep_evaluation.html')
 
-# TEP Optimization Endpoint
+# Recommendations describe a subsequent training experiment. They are not
+# reported as an applied improvement to an untrained, in-memory policy.
 @app.route('/api/tep/optimize', methods=['POST'])
 def optimize_tep_controller():
+    from rl_learning.industrial_evaluation import evaluate_tep_checkpoint
+    from tep_optimizer import TEPOptimizer
     try:
-        from tep_optimizer import TEPOptimizer
-        from tep_evaluator import evaluate_tep_sac
-        from tennessee_eastman_env import TennesseeEastmanEnv
-        from deep_rl_agent import SACAgent
-        
-        # Fast evaluation mode
-        num_episodes = 10
-        max_steps = 30
-        
-        env = TennesseeEastmanEnv(max_steps=max_steps)
-        agent = SACAgent(state_dim=15, action_dim=6)
-        
-        all_states = []
-        all_setpoints = []
-        all_quality_flags = []
-        all_product_compositions = []
-        all_safety_violations = []
-        all_energy_consumption = []
-        all_production_output = []
-        all_rewards = []
-        
-        for episode in range(num_episodes):
-            state, _ = env.reset()
-            ep_reward = 0.0
-            
-            for step in range(max_steps):
-                action = agent.select_action(state)
-                next_state, reward, terminated, truncated, info = env.step(action)
-                
-                all_states.append(state)
-                all_setpoints.append([
-                    env.REACTOR_TEMP_NORM, env.REACTOR_PRESS_NORM, env.REACTOR_LEVEL_NORM,
-                    env.SEPARATOR_TEMP_NORM, env.SEPARATOR_LEVEL_NORM,
-                    env.STRIPPER_LEVEL_NORM,
-                    env.PRODUCT_FLOW_NORM, env.PRODUCT_COMP_A_NORM,
-                    env.FEED_TOTAL_NORM, env.FEED_RATIO_D_NORM,
-                    env.COOLING_TEMP_NORM, env.RECYCLE_FLOW_NORM,
-                    env.PURGE_RATE_NORM, env.COMPRESSOR_WORK_NORM, env.AGITATOR_SPEED_NORM
-                ])
-                all_quality_flags.append(info.get('product_quality', 'Fail'))
-                all_product_compositions.append(info.get('product_comp_A', 0.0))
-                all_energy_consumption.append(info.get('compressor_work', 0.0))
-                all_production_output.append(info.get('product_flow', 0.0))
-                
-                ep_reward += reward
-                state = next_state
-                if terminated or truncated:
-                    break
-            
-            all_safety_violations.append(0)
-            all_rewards.append(ep_reward)
-        
-        eval_data = {
-            'states': np.array(all_states),
-            'setpoints': np.array(all_setpoints),
-            'quality_flags': all_quality_flags,
-            'product_compositions': np.array(all_product_compositions),
-            'safety_violations': all_safety_violations,
-            'emergency_shutdowns': 0,
-            'constraint_margins': np.random.uniform(0.1, 0.3, size=len(all_states)),
-            'energy_consumption': np.array(all_energy_consumption),
-            'production_output': np.array(all_production_output),
-            'rewards': np.array(all_rewards),
-            'production_quality': np.array([1 if q == 'Pass' else 0 for q in all_quality_flags])
-        }
-        
-        # Evaluate current performance
-        result = evaluate_tep_sac(eval_data)
-        
-        # Generate optimization recommendations
-        optimizer = TEPOptimizer()
-        recommendations = optimizer.analyze_evaluation(result)
-        
-        # Apply recommendations to agent
-        changes = optimizer.apply_optimization(agent, recommendations)
-        
-        # Store optimized agent (in memory for demo purposes)
-        global optimized_agent
-        optimized_agent = agent
-        
-        return jsonify({
-            'success': True,
-            'applied_count': len(changes['applied']),
-            'skipped_count': len(changes['skipped']),
-            'parameters_changed': changes['parameters_changed'],
-            'applied_strategies': [r['strategy'] for r in changes['applied']],
-            'message': f"Successfully applied {len(changes['applied'])} optimization strategies"
-        })
-        
-    except Exception as e:
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        })
+        result, _ = evaluate_tep_checkpoint(app.config['TEP_SAC_CHECKPOINT'])
+        recommendations = TEPOptimizer().analyze_evaluation(result)
+        return jsonify(success=True, mode='recommendations_only', applied_count=0,
+                       recommendations=[vars(item) for item in recommendations],
+                       message='已根据检查点评估生成建议；请修改训练配置、重新训练并独立评估后判断收益。')
+    except FileNotFoundError as error:
+        return jsonify(success=False, error=str(error), status='checkpoint_required'), 409
+    except Exception:
+        app.logger.exception('TEP optimization analysis failed')
+        return jsonify(success=False, error='TEP 优化分析失败，请查看服务日志'), 500
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)

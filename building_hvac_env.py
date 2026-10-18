@@ -121,7 +121,7 @@ class BuildingHVACEnv(gym.Env):
         self.energy_used = 0.0
 
         if seed is not None:
-            np.random.seed(seed)
+            self.np_random = np.random.default_rng(seed)
 
     def _get_outdoor_temp(self) -> float:
         """Sinusoidal outdoor temperature: peaks at 14:00, trough at 02:00."""
@@ -136,7 +136,7 @@ class BuildingHVACEnv(gym.Env):
     def _get_occupancy(self, zone_name: str) -> float:
         """Get occupancy for a zone at current hour, with noise."""
         base = self.OCC_SCHEDULES[zone_name](self.hour_of_day)
-        noise = np.random.normal(0, 0.05)
+        noise = self.np_random.normal(0, 0.05)
         return np.clip(base + noise, 0.0, 1.0)
 
     def _init_zones(self) -> Dict:
@@ -145,8 +145,8 @@ class BuildingHVACEnv(gym.Env):
         for name in self.ZONE_NAMES:
             comfort = self.COMFORT[name]
             zones[name] = {
-                "temp": np.random.uniform(comfort["temp"] - 2, comfort["temp"] + 2),
-                "humidity": np.random.uniform(comfort["humid"] - 5, comfort["humid"] + 5),
+                "temp": self.np_random.uniform(comfort["temp"] - 2, comfort["temp"] + 2),
+                "humidity": self.np_random.uniform(comfort["humid"] - 5, comfort["humid"] + 5),
                 "occupancy": self._get_occupancy(name),
                 "heater": 0.0,
                 "cooler": 0.0,
@@ -319,10 +319,10 @@ class BuildingHVACEnv(gym.Env):
         """Reset environment to initial state."""
         super().reset(seed=seed)
         if seed is not None:
-            np.random.seed(seed)
+            self.np_random = np.random.default_rng(seed)
 
         self.step_count = 0
-        self.hour_of_day = 8.0 + np.random.uniform(-1, 1)
+        self.hour_of_day = 8.0 + self.np_random.uniform(-1, 1)
         self.energy_used = 0.0
         self.zones = self._init_zones()
 

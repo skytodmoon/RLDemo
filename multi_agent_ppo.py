@@ -117,11 +117,11 @@ class CentralizedCritic(nn.Module):
     Centralized value function. Sees the full building state
     to estimate V(s) for advantage computation.
 
-    Input: full 15-dim state (4 zones × 3 vars + 3 env vars)
+    Input: full 16-dim state, including remaining energy budget
     Output: scalar value V(s)
     """
 
-    def __init__(self, state_dim: int = 15, hidden_dim: int = 128):
+    def __init__(self, state_dim: int = 16, hidden_dim: int = 128):
         super().__init__()
         self.net = nn.Sequential(
             nn.Linear(state_dim, hidden_dim),
@@ -154,7 +154,7 @@ class MultiAgentRolloutBuffer:
     """Stores trajectories for MAPPO training."""
 
     def __init__(self, num_zones: int = 4, zone_obs_dim: int = 6,
-                 full_state_dim: int = 15, num_actions: int = 4):
+                 full_state_dim: int = 16, num_actions: int = 4):
         self.num_zones = num_zones
         self.zone_obs_dim = zone_obs_dim
         self.full_state_dim = full_state_dim
@@ -165,14 +165,19 @@ class MultiAgentRolloutBuffer:
         self.zone_obs = []       # List[List[Tensor]] - per-zone obs per step
         self.full_states = []    # List[Tensor] - full state per step
         self.actions = []        # List[Tensor] - joint actions per step
-        self.log_probs = []      # List[Tensor] - joint log probs per step
+        self.log_probs = []      # per-zone behavior log probabilities
         self.rewards = []        # List[float]
         self.values = []         # List[float]
         self.dones = []          # List[bool]
+        self.terminals = []
+        self.next_values = []
 
     def add(self, zone_obs: List[np.ndarray], full_state: np.ndarray,
-            action: np.ndarray, log_prob: float, reward: float,
-            value: float, done: bool):
+            action: np.ndarray, log_prob: np.ndarray, reward: float,
+            value: float, done: bool, next_value=None, terminated=None):
+        log_prob = np.asarray(log_prob, dtype=np.float32)
+        if log_prob.shape != (self.num_zones,):
+            raise ValueError('MAPPO needs one behavior log probability per zone')
         self.zone_obs.append([torch.FloatTensor(o) for o in zone_obs])
         self.full_states.append(torch.FloatTensor(full_state))
         self.actions.append(torch.FloatTensor(action))
@@ -180,6 +185,8 @@ class MultiAgentRolloutBuffer:
         self.rewards.append(reward)
         self.values.append(value)
         self.dones.append(done)
+        self.terminals.append(done if terminated is None else terminated)
+        self.next_values.append(next_value)
 
     def compute_returns_and_advantages(self, gamma: float = 0.99, lam: float = 0.95,
                                          last_value: float = 0.0) -> Tuple[torch.Tensor, torch.Tensor]:
@@ -193,7 +200,9 @@ class MultiAgentRolloutBuffer:
         last_gae = 0
 
         for t in reversed(range(T)):
-            delta = rewards[t] + gamma * values[t + 1] * (1 - dones[t]) - values[t]
+            next_value = values[t + 1] if self.next_values[t] is None else self.next_values[t]
+            # Bootstrap on timeout, but never carry GAE into a reset episode.
+            delta = rewards[t] + gamma * next_value * (1 - self.terminals[t]) - values[t]
             advantages[t] = last_gae = delta + gamma * lam * (1 - dones[t]) * last_gae
 
         returns = advantages + values[:-1]
@@ -216,7 +225,7 @@ class MultiAgentRolloutBuffer:
 
             batch_full_state = torch.stack([self.full_states[i] for i in idx])
             batch_actions = torch.stack([self.actions[i] for i in idx])
-            batch_log_probs = torch.tensor([self.log_probs[i] for i in idx], dtype=torch.float32)
+            batch_log_probs = torch.tensor(np.array([self.log_probs[i] for i in idx]), dtype=torch.float32)
             batch_advantages = advantages[idx]
             batch_returns = returns[idx]
 
@@ -247,13 +256,14 @@ class MultiAgentPPO:
     """
 
     def __init__(self, num_zones: int = 4, zone_obs_dim: int = 6,
-                 full_state_dim: int = 15, num_actions: int = 4,
+                 full_state_dim: int = 16, num_actions: int = 4,
                  lr_actor: float = 3e-4, lr_critic: float = 1e-3,
                  gamma: float = 0.99, lam: float = 0.95,
                  clip_eps: float = 0.2, entropy_coef: float = 0.01,
                  value_coef: float = 0.5, max_grad_norm: float = 0.5):
         self.num_zones = num_zones
         self.num_actions = num_actions
+        self.full_state_dim = full_state_dim
         self.gamma = gamma
         self.lam = lam
         self.clip_eps = clip_eps
@@ -292,8 +302,8 @@ class MultiAgentPPO:
 
         Returns:
             joint_action: 16-dim array
-            zone_log_probs: per-zone log probabilities
-            joint_log_prob: summed log probability
+            zone_inputs: local observations with context, one per actor
+            zone_log_probs: separate behavior log probability for each actor
             value: critic value estimate
         """
         # Parse zone observations (each zone: 3 vars)
@@ -313,27 +323,28 @@ class MultiAgentPPO:
 
         # Get actions from each actor
         joint_action = []
-        joint_log_prob = 0.0
+        zone_log_probs = []
 
         with torch.no_grad():
             for z, actor in enumerate(self.actors):
                 zone_tensor = torch.FloatTensor(zone_inputs[z]).unsqueeze(0)
                 action, log_prob = actor.get_action_and_logprob(zone_tensor)
                 joint_action.append(action.squeeze(0).numpy())
-                joint_log_prob += log_prob.item()
+                zone_log_probs.append(log_prob.item())
 
             # Critic value
-            full_state = torch.FloatTensor(obs[:15]).unsqueeze(0)  # exclude energy_rem for critic
+            full_state = torch.FloatTensor(obs[:self.full_state_dim]).unsqueeze(0)
             value = self.critic(full_state).item()
 
         joint_action = np.concatenate(joint_action)
-        return joint_action, zone_inputs, joint_log_prob, value
+        return joint_action, zone_inputs, np.array(zone_log_probs, dtype=np.float32), value
 
     def store_transition(self, zone_obs: List[np.ndarray], full_state: np.ndarray,
-                          action: np.ndarray, log_prob: float, reward: float,
-                          value: float, done: bool):
+                          action: np.ndarray, log_prob: np.ndarray, reward: float,
+                          value: float, done: bool, next_value=None, terminated=None):
         """Store a transition in the rollout buffer."""
-        self.buffer.add(zone_obs, full_state, action, log_prob, reward, value, done)
+        self.buffer.add(zone_obs, full_state, action, log_prob, reward, value, done,
+                        next_value=next_value, terminated=terminated)
 
     def update(self, num_epochs: int = 4, batch_size: int = 64) -> Dict:
         """
@@ -342,13 +353,15 @@ class MultiAgentPPO:
         Returns:
             Dictionary of training metrics
         """
+        if not self.buffer.rewards:
+            return {}
         # Compute advantages
         advantages, returns = self.buffer.compute_returns_and_advantages(
             self.gamma, self.lam
         )
 
         # Normalize advantages
-        advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
+        advantages = (advantages - advantages.mean()) / (advantages.std(unbiased=False) + 1e-8)
 
         # Training loop
         stats = defaultdict(float)
@@ -362,8 +375,8 @@ class MultiAgentPPO:
 
                 for z, actor in enumerate(self.actors):
                     zone_obs = batch["zone_obs"][z]
-                    actions = batch["actions"][:, z * 4:(z + 1) * 4]
-                    old_log_probs = batch["old_log_probs"]
+                    actions = batch["actions"][:, z * self.num_actions:(z + 1) * self.num_actions]
+                    old_log_probs = batch["old_log_probs"][:, z]
 
                     # Evaluate current policy
                     new_log_probs, entropy = actor.evaluate_actions(zone_obs, actions)
@@ -452,7 +465,7 @@ def train_mappo(num_episodes: int = 200, max_steps: int = 288,
     agent = MultiAgentPPO(
         num_zones=4,
         zone_obs_dim=6,
-        full_state_dim=15,
+        full_state_dim=16,
         num_actions=4,
         lr_actor=3e-4,
         lr_critic=1e-3,
@@ -488,8 +501,11 @@ def train_mappo(num_episodes: int = 200, max_steps: int = 288,
             done = terminated or truncated
 
             # Store transition
-            full_state = obs[:15]
-            agent.store_transition(zone_obs, full_state, action, log_prob, reward, value, done)
+            full_state = obs[:agent.full_state_dim]
+            with torch.no_grad():
+                next_value = agent.critic(torch.as_tensor(next_obs[:agent.full_state_dim]).unsqueeze(0)).item()
+            agent.store_transition(zone_obs, full_state, action, log_prob, reward, value, done,
+                                   next_value=next_value, terminated=terminated)
 
             episode_reward += reward
             total_steps += 1
@@ -502,7 +518,7 @@ def train_mappo(num_episodes: int = 200, max_steps: int = 288,
             obs = next_obs
 
             # Update policy
-            if (step + 1) % update_interval == 0:
+            if (step + 1) % update_interval == 0 or done:
                 update_stats = agent.update(num_epochs=num_update_epochs)
                 history["actor_losses"].append(update_stats.get("actor_loss", 0))
                 history["critic_losses"].append(update_stats.get("critic_loss", 0))

@@ -47,7 +47,13 @@ class MBPOPolicy(nn.Module):
         return x
 
 class MBPOAgent:
+    """Educational learned-model planner, not a reproduction of paper MBPO.
+
+    Uses one-hot discrete actions and a score-function policy update through
+    sampled model rollouts. No synthetic replay/SAC mixing is implemented.
+    """
     def __init__(self, state_dim, action_dim):
+        self.action_dim = action_dim
         self.transition_model = TransitionModel(state_dim, action_dim)
         self.reward_model = RewardModel(state_dim, action_dim)
         self.policy = MBPOPolicy(state_dim, action_dim)
@@ -82,14 +88,15 @@ class MBPOAgent:
         
         for _ in range(epochs):
             batch = np.random.choice(len(self.buffer), 128, replace=False)
-            states = torch.tensor([self.buffer[i]['state'] for i in batch], dtype=torch.float32)
-            actions = torch.tensor([[self.buffer[i]['action']] for i in batch], dtype=torch.float32)
-            next_states = torch.tensor([self.buffer[i]['next_state'] for i in batch], dtype=torch.float32)
+            states = torch.tensor(np.array([self.buffer[i]['state'] for i in batch]), dtype=torch.float32)
+            action_ids = torch.tensor([self.buffer[i]['action'] for i in batch], dtype=torch.long)
+            actions = torch.nn.functional.one_hot(action_ids, self.action_dim).float()
+            next_states = torch.tensor(np.array([self.buffer[i]['next_state'] for i in batch]), dtype=torch.float32)
             rewards = torch.tensor([[self.buffer[i]['reward']] for i in batch], dtype=torch.float32)
             
             self.transition_optimizer.zero_grad()
             mean, std = self.transition_model(states, actions)
-            transition_loss = nn.MSELoss()(mean, next_states)
+            transition_loss = (torch.log(std) + 0.5 * ((next_states - mean) / std).square()).mean()
             transition_loss.backward()
             self.transition_optimizer.step()
             
@@ -101,59 +108,67 @@ class MBPOAgent:
         
         return {'transition_loss': transition_loss.item(), 'reward_loss': reward_loss.item()}
     
+    @torch.no_grad()
     def plan(self, initial_state):
         initial_state = torch.tensor(initial_state, dtype=torch.float32).unsqueeze(0)
         states = initial_state.repeat(self.num_particles, 1)
         total_rewards = torch.zeros(self.num_particles)
         
-        for _ in range(self.horizon):
+        first_actions = None
+        for step in range(self.horizon):
             probs = self.policy(states)
             actions = torch.multinomial(probs, 1)
-            actions_onehot = torch.zeros(self.num_particles, 3)
-            actions_onehot.scatter_(1, actions, 1)
-            
-            mean, std = self.transition_model(states, actions_onehot)
-            states = mean + std * torch.randn_like(std)
+            if first_actions is None:
+                first_actions = actions.squeeze(1)
+            actions_onehot = torch.nn.functional.one_hot(actions.squeeze(1), self.action_dim).float()
             
             rewards = self.reward_model(states, actions_onehot)
-            total_rewards += rewards.squeeze()
+            total_rewards += self.gamma ** step * rewards.squeeze(1)
+            mean, std = self.transition_model(states, actions_onehot)
+            states = mean + std * torch.randn_like(std)
         
-        best_action = torch.argmax(total_rewards).item()
-        return best_action
+        best_particle = torch.argmax(total_rewards).item()
+        return int(first_actions[best_particle].item())
     
     def train_policy(self, iterations=5):
         if len(self.buffer) < 128:
             return
-        
         for _ in range(iterations):
             batch = np.random.choice(len(self.buffer), 64, replace=False)
-            states = torch.tensor([self.buffer[i]['state'] for i in batch], dtype=torch.float32)
-            
-            self.policy_optimizer.zero_grad()
-            
-            total_return = 0
+            states = torch.tensor(np.array([self.buffer[i]['state'] for i in batch]), dtype=torch.float32)
+            particle_logs, particle_rewards = [], []
             for _ in range(self.num_particles):
                 current_states = states.clone()
-                episode_return = 0
-                
-                for h in range(self.horizon):
-                    probs = self.policy(current_states)
-                    actions = torch.multinomial(probs, 1)
-                    actions_onehot = torch.zeros(64, 3)
-                    actions_onehot.scatter_(1, actions, 1)
-                    
-                    mean, std = self.transition_model(current_states, actions_onehot)
-                    current_states = mean + std * torch.randn_like(std)
-                    
-                    rewards = self.reward_model(current_states, actions_onehot)
-                    episode_return += (self.gamma ** h) * rewards.mean()
-                
-                total_return += episode_return
-            
-            loss = -total_return / self.num_particles
+                logs, rewards = [], []
+                for _ in range(self.horizon):
+                    dist = torch.distributions.Categorical(probs=self.policy(current_states))
+                    actions = dist.sample()
+                    logs.append(dist.log_prob(actions))
+                    actions_onehot = torch.nn.functional.one_hot(actions, self.action_dim).float()
+                    # A discrete sample has no pathwise gradient. Use log pi
+                    # with model returns rather than backprop through indices.
+                    with torch.no_grad():
+                        rewards.append(self.reward_model(current_states, actions_onehot).squeeze(1))
+                        mean, std = self.transition_model(current_states, actions_onehot)
+                        current_states = mean + std * torch.randn_like(std)
+                particle_logs.append(torch.stack(logs))
+                particle_rewards.append(torch.stack(rewards))
+            rewards = torch.stack(particle_rewards)
+            returns = torch.zeros_like(rewards)
+            running = torch.zeros_like(rewards[:, 0])
+            for h in reversed(range(self.horizon)):
+                running = rewards[:, h] + self.gamma * running
+                returns[:, h] = running
+            if self.num_particles > 1:
+                baseline = (returns.sum(dim=0, keepdim=True) - returns) / (self.num_particles - 1)
+            else:
+                baseline = torch.zeros_like(returns)
+            weights = self.gamma ** torch.arange(self.horizon, dtype=torch.float32)[None, :, None]
+            loss = -(torch.stack(particle_logs) * (returns - baseline).detach() * weights).mean()
+            self.policy_optimizer.zero_grad()
             loss.backward()
+            torch.nn.utils.clip_grad_norm_(self.policy.parameters(), 1.0)
             self.policy_optimizer.step()
-        
         return {'policy_loss': loss.item()}
 
 if __name__ == '__main__':
@@ -178,7 +193,7 @@ if __name__ == '__main__':
             total_reward += reward
             obs = next_obs
             
-            if terminated:
+            if terminated or truncated:
                 break
         
         if episode >= 10:

@@ -204,7 +204,7 @@ if __name__ == '__main__':
             total_reward += reward
             obs = next_obs
             
-            if terminated:
+            if terminated or truncated:
                 break
         
         if episode >= 5:

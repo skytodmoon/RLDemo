@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>强化学习课程实验室 · RLDemo</title>
+    <style>
+        :root { color-scheme: dark; --bg:#101b29; --panel:#192a3b; --line:#344b61; --ink:#e7edf3; --muted:#b0c2d3; --accent:#89e2c9; }
+        * { box-sizing:border-box; }
+        body { margin:0; background:var(--bg); color:var(--ink); font:16px/1.7 system-ui,sans-serif; }
+        main { max-width:1200px; margin:auto; padding:32px 24px 60px; }
+        a { color:var(--accent); } h1 { font-size:36px; line-height:1.3; margin:16px 0; }
+        h2 { font-size:23px; margin-top:32px; } h3 { font-size:19px; margin:0 0 12px; }
+        p { margin:8px 0 16px; } .muted { color:var(--muted); } .lead { max-width:850px; }
+        .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(310px,1fr)); gap:16px; }
+        article,.panel { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:22px; }
+        article { display:flex; flex-direction:column; } article p { flex:1; }
+        .badge { color:var(--accent); font-size:13px; display:block; margin-bottom:9px; }
+        code,pre { font:14px/1.7 ui-monospace,monospace; } code { overflow-wrap:anywhere; }
+        pre { overflow:auto; background:#0b1420; padding:16px; border-radius:6px; white-space:pre-wrap; }
+        button,input { font:inherit; border:1px solid var(--line); border-radius:6px; padding:8px 12px; }
+        button { background:var(--accent); color:#0b2924; cursor:pointer; font-weight:600; }
+        button:disabled { opacity:.5; cursor:wait; } .read { background:transparent; color:var(--ink); margin-top:12px; }
+        .commands { margin-top:14px; } .controls { display:flex; gap:12px; flex-wrap:wrap; align-items:center; }
+        #result { min-height:120px; } .pass { color:#89e2c9; } .fail { color:#ffb4a9; }
+        table { width:100%; border-collapse:collapse; } td,th { text-align:left; padding:8px; border-bottom:1px solid var(--line); }
+        details { margin:12px 0; } summary { cursor:pointer; } #progress { color:var(--accent); }
+        @media(max-width:600px) { h1 { font-size:28px; } main { padding:20px 16px; } .grid { grid-template-columns:1fr; } }
+    </style>
+</head>
+<body>
+<main>
+    <nav><a href="/">工业演示</a> / 课程实验室</nav>
+    <h1>把每一课变成可验证的实验</h1>
+    <p class="lead muted">先理解 MDP 与更新公式，再运行有解析答案的基础实验，最后用真实训练和独立评估验证工业温控。每一课都列出代码位置、验证问题和练习。</p>
+    <div class="panel">
+        <div class="controls"><label for="seed">实验种子</label><input id="seed" type="number" min="0" max="4294967295" value="0" style="width:140px"><span id="progress" aria-live="polite"></span></div>
+        <p class="muted">基础实验在本机运行。这里的“已阅读”只记录阅读进度；实验通过只代表所列条件满足，不能代替对整章知识的掌握。</p>
+        <div id="result" role="status" aria-live="polite">选择一课的“运行实验”，查看实际计算结果。</div>
+    </div>
+    <h2>12 课的学习与代码对应关系</h2>
+    <div class="grid">
+    {% for lesson in lessons %}
+        <article>
+            <span class="badge">第 {{ lesson.lesson }} 课 · {{ {'automated':'基础机制可自动验证','partial':'部分机制已验证，其余需扩展','guided':'阅读与研究练习'}[lesson.coverage] }}</span>
+            <h3>{{ lesson.title }}</h3>
+            <p>{{ lesson.question }}</p>
+            <details><summary>代码与练习</summary>
+                <p class="muted">{{ lesson.exercise }}</p>
+                {% for file in lesson.files %}<div><code>{{ file }}</code></div>{% endfor %}
+            </details>
+            {% if lesson.lab in labs %}
+                <button type="button" data-lab="{{ lesson.lab }}">运行 {{ lesson.lab }} 实验</button>
+            {% elif lesson.lab == 'deep' %}
+                <div class="commands">在项目终端运行：<pre>python -m rl_learning run --lab deep --algorithm {{ lesson.algorithm }} --seeds 0 1 2 --timesteps 40000 --eval-seed-base 20000 --output results/{{ lesson.algorithm }}</pre></div>
+            {% else %}<p class="muted">请按代码与练习设计留出实验，当前没有自动通过判定。</p>{% endif %}
+            <button type="button" class="read" data-lesson="{{ lesson.lesson }}" aria-pressed="false">标记已阅读</button>
+        </article>
+    {% endfor %}
+    </div>
+    <h2>完整记录一次验证</h2>
+    <p>基础实验、多个训练种子与独立温控评估，输出 JSON、CSV、Markdown 和模型检查点：</p>
+    <pre>python -m rl_learning verify --include-deep --algorithms ppo dqn a2c reinforce --seeds 0 1 2 --timesteps 40000 --eval-seed-base 20000 --output results/full</pre>
+    <p class="muted">查看 report.md 中的 PASS/FAIL，再分析 learning_curves.csv 与 evaluation.csv。失败同样是实验结果。规则基线可能优于训练策略；L9 不确定性、TRPO、MCTS、RND、NGU 和真实工业验证仍需独立实验。</p>
+</main>
+<script>
+    const output = document.querySelector('#result');
+    const runButtons = [...document.querySelectorAll('[data-lab]')];
+    let read = new Set();
+    try { const saved = JSON.parse(localStorage.getItem('rldemo-read-lessons') || '[]'); if (Array.isArray(saved)) read = new Set(saved.filter(n => Number.isInteger(n) && n >= 1 && n <= 12)); } catch (_) {}
+    function updateProgress() {
+        document.querySelector('#progress').textContent = `已阅读 ${read.size} / 12 课`;
+        document.querySelectorAll('[data-lesson]').forEach(button => {
+            const marked = read.has(Number(button.dataset.lesson));
+            button.textContent = marked ? '已阅读 · 再次点击撤销' : '标记已阅读';
+            button.setAttribute('aria-pressed', String(marked));
+        });
+    }
+    document.querySelectorAll('[data-lesson]').forEach(button => button.addEventListener('click', () => {
+        const id = Number(button.dataset.lesson);
+        read.has(id) ? read.delete(id) : read.add(id);
+        try { localStorage.setItem('rldemo-read-lessons', JSON.stringify([...read])); } catch (_) {}
+        updateProgress();
+    }));
+    runButtons.forEach(button => button.addEventListener('click', async () => {
+        const seedText = document.querySelector('#seed').value.trim();
+        const seed = Number(seedText);
+        if (seedText === '' || !Number.isInteger(seed) || seed < 0 || seed >= 2**32) { output.textContent = '请输入有效的非负整数种子。'; return; }
+        runButtons.forEach(b => b.disabled = true);
+        output.textContent = `正在运行 ${button.dataset.lab}，使用种子 ${seed} …`;
+        try {
+            const response = await fetch('/api/learning/run', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({lab:button.dataset.lab, seed})});
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.error || '实验请求失败');
+            output.replaceChildren();
+            const title = document.createElement('p');
+            title.textContent = `${data.passed ? 'PASS' : 'FAIL'} · ${data.result.lab} · seed ${seed}`;
+            title.className = data.passed ? 'pass' : 'fail'; output.append(title);
+            for (const [check, passed] of Object.entries(data.result.checks)) {
+                const row = document.createElement('div'); row.textContent = `${passed ? '✓' : '✗'} ${check}`; output.append(row);
+            }
+            const detail = document.createElement('details'); const summary = document.createElement('summary'); summary.textContent = '查看指标与学习曲线原始数据';
+            const pre = document.createElement('pre'); pre.textContent = JSON.stringify(data.result, null, 2); detail.append(summary, pre); output.append(detail);
+            const note = document.createElement('p'); note.className = 'muted'; note.textContent = data.note; output.append(note);
+        } catch (error) { output.textContent = error.message; }
+        finally { runButtons.forEach(b => b.disabled = false); }
+    }));
+    updateProgress();
+</script>
+</body>
+</html>

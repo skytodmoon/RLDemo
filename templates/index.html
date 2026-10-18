@@ -404,6 +404,7 @@
     </style>
 </head>
 <body>
+    {% include "simulation_notice.html" %}
     <div class="container">
         <header>
             <h1>🤖 工业智能控制仿真平台</h1>
@@ -411,6 +412,7 @@
         </header>
         
         <div class="nav-bar">
+            <a href="/learning" class="nav-btn">课程实验与验证</a>
             <a href="/" class="nav-btn active">RL 温控 Demo</a>
             <a href="/pinns" class="nav-btn">PINNs Demo</a>
             <a href="/building-hvac" class="nav-btn">🏢 Building HVAC</a>

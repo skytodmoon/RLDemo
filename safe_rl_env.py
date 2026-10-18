@@ -13,8 +13,8 @@ class SafeIndustrialTempEnv(gym.Env):
         
         self.action_space = spaces.Discrete(3)
         self.observation_space = spaces.Box(
-            low=np.array([self.temp_min, 0.0]),
-            high=np.array([self.temp_max, 1.0]),
+            low=np.array([self.temp_min, 0.0], dtype=np.float32),
+            high=np.array([self.temp_max, 1.0], dtype=np.float32),
             dtype=np.float32
         )
         
@@ -42,20 +42,24 @@ class SafeIndustrialTempEnv(gym.Env):
     
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
-        self.current_temp = np.random.uniform(22, 28)
+        self.current_temp = float(self.np_random.uniform(22, 28))
         self.safety_layer_active = False
         self.violation_count = 0
         self.episode_steps = 0
         return self._get_obs(), self._get_info()
     
     def _safety_filter(self, action):
-        if self.current_temp <= self.temp_min + 1.0 and action == 1:
-            return 0
-        if self.current_temp >= self.temp_max - 1.0 and action == 2:
-            return 0
+        # Heating raises temperature; cooling and idle both lower it.
+        # At the lower boundary idle is not a safe fallback.
+        if self.current_temp <= self.temp_min + 1.0 and action != 1:
+            return 1
+        if self.current_temp >= self.temp_max - 1.0 and action == 1:
+            return 2
         return action
     
     def step(self, action):
+        if not self.action_space.contains(action):
+            raise ValueError(f'Invalid action: {action}')
         self.episode_steps += 1
         
         original_action = action
@@ -85,8 +89,8 @@ class SafeIndustrialTempEnv(gym.Env):
         if self.current_temp <= self.temp_min or self.current_temp >= self.temp_max:
             reward -= 50.0
         
-        terminated = self.episode_steps >= 100
-        truncated = False
+        terminated = False
+        truncated = self.episode_steps >= 100
         
         return self._get_obs(), reward, terminated, truncated, self._get_info()
 
@@ -105,9 +109,9 @@ class SafeLayer:
     
     def filter_action(self, action):
         if action == 1 and not self.safe_actions['heat_allowed']:
-            return 0
-        if action == 2 and not self.safe_actions['cool_allowed']:
-            return 0
+            return 2
+        if action != 1 and not self.safe_actions['cool_allowed']:
+            return 1
         return action
 
 if __name__ == '__main__':
@@ -120,5 +124,5 @@ if __name__ == '__main__':
         action = env.action_space.sample()
         obs, reward, terminated, truncated, info = env.step(action)
         print(f"Action: {action}, Obs: {obs}, Reward: {reward:.2f}, Info: {info}")
-        if terminated:
+        if terminated or truncated:
             break

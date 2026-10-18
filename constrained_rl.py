@@ -46,6 +46,11 @@ class ConstraintCritic(nn.Module):
         return x
 
 class CPOAgent:
+    """Compatibility name for a simplified Lagrangian actor-critic.
+
+    This implementation does not solve the trust-region CPO optimization.
+    ``c`` is a per-transition mean cost target, not a hard safety guarantee.
+    """
     def __init__(self, state_dim, action_dim, lam=0.01, c=1.0):
         self.actor = ConstrainedActor(state_dim, action_dim)
         self.critic = ConstrainedCritic(state_dim)
@@ -92,22 +97,22 @@ class CPOAgent:
         if len(self.buffer) < 32:
             return
         
-        states = torch.tensor([t['state'] for t in self.buffer], dtype=torch.float32)
+        states = torch.tensor(np.array([t['state'] for t in self.buffer]), dtype=torch.float32)
         actions = torch.tensor([t['action'] for t in self.buffer], dtype=torch.long)
         rewards = torch.tensor([t['reward'] for t in self.buffer], dtype=torch.float32)
         constraint_costs = torch.tensor([t['constraint_cost'] for t in self.buffer], dtype=torch.float32)
-        next_states = torch.tensor([t['next_state'] for t in self.buffer], dtype=torch.float32)
+        next_states = torch.tensor(np.array([t['next_state'] for t in self.buffer]), dtype=torch.float32)
         dones = torch.tensor([t['done'] for t in self.buffer], dtype=torch.float32)
         
         values = self.critic(states).squeeze()
         next_values = self.critic(next_states).squeeze()
         constraint_values = self.constraint_critic(states).squeeze()
         
-        advantages = self.compute_gae(rewards, values, next_values[-1], dones)
+        advantages = self.compute_gae(rewards, values.detach(), next_values[-1].detach(), dones)
         advantages = torch.tensor(advantages, dtype=torch.float32)
         advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
         
-        constraint_advantages = self.compute_gae(constraint_costs, constraint_values, 0, dones)
+        constraint_advantages = self.compute_gae(constraint_costs, constraint_values.detach(), 0, dones)
         constraint_advantages = torch.tensor(constraint_advantages, dtype=torch.float32)
         
         self.actor_optimizer.zero_grad()
@@ -117,18 +122,17 @@ class CPOAgent:
         
         ratio = action_probs / (old_probs + 1e-8)
         
-        constraint_cost = constraint_advantages.mean()
-        if constraint_cost > self.c:
-            lagrangian = self.lam * (constraint_cost - self.c)
-            objective = -((ratio * advantages).mean() + lagrangian)
-        else:
-            objective = -(ratio * advantages).mean()
+        constraint_cost = constraint_costs.mean()
+        self.lam = max(0.0, self.lam + 0.01 * (constraint_cost.item() - self.c))
+        # The cost penalty must depend on action probabilities to influence
+        # actor gradients. Adding a detached scalar cannot teach constraints.
+        objective = -(ratio * advantages).mean() + self.lam * (ratio * constraint_advantages).mean()
         
         objective.backward()
         self.actor_optimizer.step()
         
         self.critic_optimizer.zero_grad()
-        value_loss = nn.MSELoss()(values, rewards + self.gamma * next_values * (1 - dones))
+        value_loss = nn.MSELoss()(values, (rewards + self.gamma * next_values * (1 - dones)).detach())
         value_loss.backward()
         self.critic_optimizer.step()
         
@@ -168,7 +172,7 @@ if __name__ == '__main__':
             total_constraint_cost += constraint_cost
             obs = next_obs
             
-            if terminated:
+            if terminated or truncated:
                 break
         
         result = agent.train()

@@ -2,9 +2,38 @@
 
 基于 OpenAI Gym + PPO 强化学习和 PINNs 物理信息神经网络的工业控制仿真平台。
 
+## 按课程学习与验证
+
+项目现已提供与强化学习 12 课对应的学习路径、基础算法实验和工业温控训练评估。
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements.txt
+./start.sh
+# 打开 http://127.0.0.1:5000/learning
+
+# 基础实验：精确 MDP、MC/TD、SARSA/Q-learning、Dyna-Q、Bandit、计数奖励
+python -m rl_learning verify --seeds 0 1 2 --output results/foundations
+
+# 真正的神经网络训练与独立评估
+python -m pip install -r requirements-train.txt
+python -m rl_learning verify --include-deep --algorithms ppo dqn a2c reinforce --seeds 0 1 2 --timesteps 40000 --eval-seed-base 20000 --output results/full
+```
+
+报告包含显式 PASS/FAIL 检查、训练前后对照、随机/规则基线、MAE、舒适度、边界违规、原始曲线、种子与版本。失败会使 CLI 返回非零退出码。`results/` 是本地输出，不提交模型和生成日志。
+
+- [逐课学习、实验问题与覆盖范围](docs/learning_path.md)
+- [验证方法与已知限制](docs/validation.md)
+- [本次实际运行结果](docs/validation_results.md)
+
+**演示与验证的区别：** `app.py` 中原有的温控/HVAC/TEP 交互页面使用规则或简化规划，没有运行训练后的 RL 模型；页面已显示说明。真实温控训练请使用上述 CLI。TEP 评估需要保存的 SAC 检查点，缺失时返回明确提示，不能用随机新网络生成“性能评分”。
+
+`CPOAgent` 是简化的拉格朗日 actor-critic；`MBPOAgent` 是学习动力学模型加采样规划的教学实现，两者均不等于对应论文算法的完整复现。L9 不确定性、TRPO、MCTS、RND/NGU 等覆盖情况在学习路径中单独标明。
+
 ## 项目概述
 
-本项目包含三个核心 Demo：
+本项目包含四个核心 Demo：
 
 ### 1. 工业温控强化学习 Demo
 - **温度范围**：20°C - 35°C（安全约束）
@@ -15,7 +44,7 @@
 ### 2. PINNs 物理信息神经网络 Demo
 - **求解问题**：一维热传导方程
 - **方法**：结合物理机理与深度学习
-- **特点**：无需大量标注数据，自动满足物理约束
+- **特点**：通过物理残差损失约束近似解，需要检查残差和边界误差
 
 ### 3. Multi-Zone HVAC 多区域建筑能源管理 Demo 🆕
 - **场景**：4区域建筑（办公室、服务器室、实验室、会议室）
@@ -43,8 +72,8 @@ RLDemo/
 ├── industrial_temp_env.py         # Gymnasium 自定义环境（基础版）
 ├── safe_rl_env.py                 # Gymnasium 自定义环境（安全层版）
 │
-├── constrained_rl.py              # CPO 约束策略优化（PyTorch NN）
-├── model_based_rl.py              # MBPO 基于模型的策略优化（PyTorch NN）
+├── constrained_rl.py              # 简化拉格朗日 actor-critic（兼容名 CPOAgent）
+├── model_based_rl.py              # 学习模型与采样规划（教学实现）
 ├── hierarchical_rl.py             # 层级RL 选项架构（PyTorch NN）
 ├── rl_mpc_hybrid.py               # RL+MPC 混合控制（PyTorch NN）
 │
@@ -261,7 +290,7 @@ def loss_fn(self, x_pde, t_pde, x_bc, t_bc, x_ic, t_ic):
 
 ```bash
 # 安装依赖
-pip install flask gymnasium stable-baselines3 numpy torch matplotlib
+python -m pip install -r requirements-train.txt
 
 # 启动服务
 python app.py
@@ -368,7 +397,7 @@ python deep_rl_agent.py
 
 ### 4. PINNs 优势
 - **数据高效**：无需大量标注数据
-- **物理一致性**：自动满足物理定律
+- **物理一致性**：通过残差损失鼓励满足物理定律，需验证误差
 - **泛化能力强**：可在未训练区域进行预测
 
 ### 5. 典型应用场景
@@ -501,7 +530,7 @@ class BuildingHVACEnv(gym.Env):
 class MultiAgentPPO:
     # 集中训练、分散执行 (CTDE)
     actors = [DecentralizedActor() for _ in range(4)]  # 每区域独立策略
-    critic = CentralizedCritic(state_dim=15)            # 全局共享评论家
+    critic = CentralizedCritic(state_dim=16)            # 全局共享评论家
 ```
 
 **环境特点**：

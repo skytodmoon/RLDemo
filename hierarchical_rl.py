@@ -199,7 +199,7 @@ if __name__ == '__main__':
             if should_terminate and not terminated:
                 agent.current_option = agent.select_high_level_action(obs)
             
-            if terminated:
+            if terminated or truncated:
                 break
         
         result = agent.train()

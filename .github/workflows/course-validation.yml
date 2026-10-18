@@ -1,0 +1,72 @@
+name: Course validation
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      run_training:
+        description: Run the full multi-seed temperature performance experiments
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  foundations:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      matrix:
+        python-version: ['3.10', '3.12']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+      - run: python -m pip install -r requirements.txt 'pytest>=8,<10'
+      - run: python -m pytest -q
+      - run: python -m rl_learning verify --output results/foundations
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: foundations-${{ matrix.python-version }}
+          path: results/foundations/
+
+  neural-regressions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - run: python -m pip install --index-url https://download.pytorch.org/whl/cpu 'torch>=2.8,<3'
+      - run: python -m pip install -r requirements-dev.txt
+      - run: python -m pytest -q
+        env:
+          OMP_NUM_THREADS: '1'
+
+  performance-experiments:
+    if: github.event_name == 'workflow_dispatch' && inputs.run_training
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - run: python -m pip install --index-url https://download.pytorch.org/whl/cpu 'torch>=2.8,<3'
+      - run: python -m pip install -r requirements-train.txt
+      - run: python -m rl_learning verify --include-deep --algorithms ppo dqn a2c reinforce --seeds 0 1 2 --timesteps 40000 --eval-seed-base 20000 --output results/full
+        env:
+          OMP_NUM_THREADS: '1'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: temperature-performance
+          path: results/full/

@@ -148,7 +148,7 @@ class TennesseeEastmanEnv(gym.Env):
         self.fault_step = 0
 
         if seed is not None:
-            np.random.seed(seed)
+            self.np_random = np.random.default_rng(seed)
 
         self.step_count = 0
         self.state = None
@@ -157,21 +157,21 @@ class TennesseeEastmanEnv(gym.Env):
     def _init_state(self) -> np.ndarray:
         """Initialize state near normal operating conditions with small perturbation."""
         state = np.array([
-            self.REACTOR_TEMP_NORM + np.random.normal(0, 2),
-            self.REACTOR_PRESS_NORM + np.random.normal(0, 30),
-            self.REACTOR_LEVEL_NORM + np.random.normal(0, 3),
-            self.SEPARATOR_TEMP_NORM + np.random.normal(0, 2),
-            self.SEPARATOR_LEVEL_NORM + np.random.normal(0, 3),
-            self.STRIPPER_LEVEL_NORM + np.random.normal(0, 3),
-            self.PRODUCT_FLOW_NORM + np.random.normal(0, 1),
-            self.PRODUCT_COMP_A_NORM + np.random.normal(0, 0.001),
-            self.FEED_TOTAL_NORM + np.random.normal(0, 1),
-            self.FEED_RATIO_D_NORM + np.random.normal(0, 0.02),
-            self.COOLING_TEMP_NORM + np.random.normal(0, 1),
-            self.RECYCLE_FLOW_NORM + np.random.normal(0, 1),
-            self.PURGE_RATE_NORM + np.random.normal(0, 0.05),
-            self.COMPRESSOR_WORK_NORM + np.random.normal(0, 5),
-            self.AGITATOR_SPEED_NORM + np.random.normal(0, 5),
+            self.REACTOR_TEMP_NORM + self.np_random.normal(0, 2),
+            self.REACTOR_PRESS_NORM + self.np_random.normal(0, 30),
+            self.REACTOR_LEVEL_NORM + self.np_random.normal(0, 3),
+            self.SEPARATOR_TEMP_NORM + self.np_random.normal(0, 2),
+            self.SEPARATOR_LEVEL_NORM + self.np_random.normal(0, 3),
+            self.STRIPPER_LEVEL_NORM + self.np_random.normal(0, 3),
+            self.PRODUCT_FLOW_NORM + self.np_random.normal(0, 1),
+            self.PRODUCT_COMP_A_NORM + self.np_random.normal(0, 0.001),
+            self.FEED_TOTAL_NORM + self.np_random.normal(0, 1),
+            self.FEED_RATIO_D_NORM + self.np_random.normal(0, 0.02),
+            self.COOLING_TEMP_NORM + self.np_random.normal(0, 1),
+            self.RECYCLE_FLOW_NORM + self.np_random.normal(0, 1),
+            self.PURGE_RATE_NORM + self.np_random.normal(0, 0.05),
+            self.COMPRESSOR_WORK_NORM + self.np_random.normal(0, 5),
+            self.AGITATOR_SPEED_NORM + self.np_random.normal(0, 5),
         ], dtype=np.float32)
 
         # Fill delay buffers with initial state
@@ -279,13 +279,13 @@ class TennesseeEastmanEnv(gym.Env):
         # Coupling: delayed reactor temp affects current via recycle
         recycle_temp_effect = (delayed_reactor_temp - s[0]) * 0.02 * a['recycle_valve']
         new_state[0] = s[0] + (target_temp - s[0] + recycle_temp_effect) / tau_temp * dt
-        new_state[0] += np.random.normal(0, 0.3)  # process noise
+        new_state[0] += self.np_random.normal(0, 0.3)  # process noise
 
         # 1: Reactor pressure (coupled to temperature and purge)
         tau_press = 8.0
         target_press = self.REACTOR_PRESS_NORM + temp_pressure_coupling - purge_pressure_relief
         new_state[1] = s[1] + (target_press - s[1]) / tau_press * dt
-        new_state[1] += np.random.normal(0, 5)
+        new_state[1] += self.np_random.normal(0, 5)
 
         # 2: Reactor level (strongly self-regulating around NORM)
         tau_level = 4.0
@@ -294,13 +294,13 @@ class TennesseeEastmanEnv(gym.Env):
         level_feedback = (s[2] - self.REACTOR_LEVEL_NORM) * 0.3
         new_state[2] = s[2] + (level_change - level_feedback) / tau_level * dt
         new_state[2] = np.clip(new_state[2], 20.0, 90.0)
-        new_state[2] += np.random.normal(0, 0.2)
+        new_state[2] += self.np_random.normal(0, 0.2)
 
         # 3: Separator temperature (coupled to reactor temp via transport delay)
         tau_sep_temp = 12.0
         sep_temp_target = delayed_reactor_temp * 0.7 + 20  # heat loss in transport
         new_state[3] = s[3] + (sep_temp_target - s[3]) / tau_sep_temp * dt
-        new_state[3] += np.random.normal(0, 0.2)
+        new_state[3] += self.np_random.normal(0, 0.2)
 
         # 4: Separator level (coupled to reactor level via transport, self-regulating)
         tau_sep_level = 6.0
@@ -310,7 +310,7 @@ class TennesseeEastmanEnv(gym.Env):
         sep_feedback = (s[4] - self.SEPARATOR_LEVEL_NORM) * 0.1
         new_state[4] = s[4] + (sep_in - sep_out - sep_feedback) / tau_sep_level * dt
         new_state[4] = np.clip(new_state[4], 20.0, 90.0)
-        new_state[4] += np.random.normal(0, 0.3)
+        new_state[4] += self.np_random.normal(0, 0.3)
 
         # 5: Stripper level (coupled to separator and product flow)
         tau_strip_level = 5.0
@@ -320,7 +320,7 @@ class TennesseeEastmanEnv(gym.Env):
         strip_feedback = (s[5] - self.STRIPPER_LEVEL_NORM) * 0.08
         new_state[5] = s[5] + (strip_in - strip_out - strip_feedback) / tau_strip_level * dt
         new_state[5] = np.clip(new_state[5], 20.0, 90.0)
-        new_state[5] += np.random.normal(0, 0.3)
+        new_state[5] += self.np_random.normal(0, 0.3)
 
         # 6: Product flow (coupled to reactor level and reactions - self-regulating)
         tau_product = 4.0
@@ -330,7 +330,7 @@ class TennesseeEastmanEnv(gym.Env):
         product_target = np.clip(product_target, 5.0, 35.0)
         new_state[6] = s[6] + (product_target - s[6]) / tau_product * dt
         new_state[6] = np.clip(new_state[6], 5.0, 35.0)
-        new_state[6] += np.random.normal(0, 0.2)
+        new_state[6] += self.np_random.normal(0, 0.2)
 
         # 7: Product composition A (large analyzer delay - uses delayed value)
         tau_comp = 10.0
@@ -341,11 +341,11 @@ class TennesseeEastmanEnv(gym.Env):
         comp_target = self.PRODUCT_COMP_A_NORM + comp_A_effect + comp_feed_effect
         # Use delayed composition for control (analyzer lag)
         new_state[7] = s[7] + (comp_target - s[7]) / tau_comp * dt
-        new_state[7] += np.random.normal(0, 0.0002)
+        new_state[7] += self.np_random.normal(0, 0.0002)
         new_state[7] = max(0, new_state[7])
 
         # 8: Total feed (directly controlled)
-        new_state[8] = total_feed_in + np.random.normal(0, 0.2)
+        new_state[8] = total_feed_in + self.np_random.normal(0, 0.2)
 
         # 9: Feed ratio D/(D+E)
         if a['feed_D'] + a['feed_E'] > 0.01:
@@ -354,23 +354,23 @@ class TennesseeEastmanEnv(gym.Env):
             new_state[9] = 0.5
 
         # 10: Cooling water temperature (directly controlled)
-        new_state[10] = a['cooling_water'] + np.random.normal(0, 0.3)
+        new_state[10] = a['cooling_water'] + self.np_random.normal(0, 0.3)
 
         # 11: Recycle flow (coupled to separator level and recycle valve)
         tau_recycle = 5.0
         recycle_target = s[4] * 0.3 * a['recycle_valve'] + 5
         new_state[11] = s[11] + (recycle_target - s[11]) / tau_recycle * dt
-        new_state[11] += np.random.normal(0, 0.2)
+        new_state[11] += self.np_random.normal(0, 0.2)
 
         # 12: Purge rate (directly controlled)
-        new_state[12] = a['purge_valve'] + np.random.normal(0, 0.01)
+        new_state[12] = a['purge_valve'] + self.np_random.normal(0, 0.01)
 
         # 13: Compressor work (coupled to recycle flow and pressure)
         new_state[13] = self.COMPRESSOR_WORK_NORM + (s[11] - self.RECYCLE_FLOW_NORM) * 2 + (s[1] - self.REACTOR_PRESS_NORM) * 0.01
-        new_state[13] += np.random.normal(0, 1)
+        new_state[13] += self.np_random.normal(0, 1)
 
         # 14: Agitator speed (relatively independent)
-        new_state[14] = self.AGITATOR_SPEED_NORM + np.random.normal(0, 1)
+        new_state[14] = self.AGITATOR_SPEED_NORM + self.np_random.normal(0, 1)
 
         # Update delay buffers
         self.reactor_temp_buffer.append(new_state[0])
@@ -392,7 +392,7 @@ class TennesseeEastmanEnv(gym.Env):
         if fault == 0:  # Fault 0: Feed A loss (step change)
             s[8] -= 5.0  # sudden feed loss
         elif fault == 1:  # Fault 1: Feed B composition (random walk)
-            s[8] += np.random.normal(0, 0.5)
+            s[8] += self.np_random.normal(0, 0.5)
         elif fault == 2:  # Fault 2: Reactor cooling water inlet temp (step)
             s[10] += 5.0
         elif fault == 3:  # Fault 3: Condenser cooling water inlet temp (drift)
@@ -467,7 +467,7 @@ class TennesseeEastmanEnv(gym.Env):
 
     def _check_safety(self, state: np.ndarray) -> bool:
         """Check if emergency shutdown is needed."""
-        return (state[0] > self.REACTOR_TEMP_MAX or
+        return bool(state[0] > self.REACTOR_TEMP_MAX or
                 state[1] > self.REACTOR_PRESS_MAX or
                 state[2] > self.REACTOR_LEVEL_MAX or
                 state[2] < self.REACTOR_LEVEL_MIN)
@@ -475,7 +475,7 @@ class TennesseeEastmanEnv(gym.Env):
     def reset(self, seed=None, options=None) -> Tuple[np.ndarray, Dict]:
         super().reset(seed=seed)
         if seed is not None:
-            np.random.seed(seed)
+            self.np_random = np.random.default_rng(seed)
 
         self.step_count = 0
         self.active_fault = None
@@ -599,7 +599,7 @@ if __name__ == "__main__":
         if step % 20 == 0:
             env.render()
             print(f"  Reward: {reward:.3f}")
-        if terminated:
+        if terminated or truncated:
             print("EMERGENCY SHUTDOWN!")
             break
 

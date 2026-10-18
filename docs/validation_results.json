@@ -1,0 +1,1363 @@
+{
+  "schema_version": 1,
+  "metadata": {
+    "created_at": "2026-10-18T10:28:25.268616+00:00",
+    "seeds": [
+      0,
+      1,
+      2
+    ],
+    "python": "3.12.7",
+    "platform": "macOS-26.6.2-arm64-arm-64bit",
+    "versions": {
+      "numpy": "1.26.4",
+      "gymnasium": "1.2.3",
+      "torch": "2.9.1",
+      "stable-baselines3": "2.8.0",
+      "Flask": "3.1.3"
+    },
+    "git_revision": "da758bcae57186aec45934a0473d23aa5e1a8d10",
+    "working_tree_dirty": true,
+    "source_sha256": {
+      "app.py": "b42720c566e31bb5aab2ca3b26906523d4ebded213367182c05d76818886f00a",
+      "building_hvac_env.py": "686afc3bb33c0294565e092f6636bdf23cd2a440e214eb097f6349976081a7ad",
+      "constrained_rl.py": "60d4a808c481e8194ae83c2a63e64161f24d3ec411a6296af821b038c1616ecc",
+      "constrained_rl_demo.py": "8c519de36ed85dea74baab0f00f8a00dea4261693fd055ae69098436c96b2fa9",
+      "deep_rl_agent.py": "5d385f652a953c13241eafcd6e83c2d3e0b8c4c5674b1f4c21a9216331eda89f",
+      "hierarchical_rl.py": "6f59dbbf884b1ba98ea430d7d522af2d1f20b872db47a58d4320755b0c786132",
+      "hierarchical_rl_demo.py": "3db14ec1f74d1f668f5280afb5fae9b28654f04e4aba77db862d39d9a10eafa1",
+      "industrial_temp_env.py": "f609f6d6ba65081bc9f31e4936f4b9a6d2a3a0f6b6850f82c9bbafef510fbf57",
+      "learn_constrained_rl.py": "3dac40d330d2c785cbb97fdef224d6e83425eccd480114c92302edebb1ca5c14",
+      "learn_hierarchical_rl.py": "3fa52db362ea737c4e371597405f65a63ce0896e897d10ddb69f9a2076b79e72",
+      "learn_mbpo.py": "a75dae8b185b59493955b9e98d1bff31839920c09b2243e3353f3c2cdbf58e2b",
+      "learn_rl_mpc.py": "fda071883cd008bbdd488a1e5fea9f098a4f7e064a804731bd31e7709f1a31f2",
+      "learn_safe_rl.py": "05096d39c6dbebd5699db72335ade9176e81bfc7c259b1d7262b395c21563d55",
+      "main.py": "c8c6780a463779908e14e8a5ea78f8e68e30bb48a63fa81086a6aafb26e23947",
+      "mbpo_demo.py": "dda381c81eccfb8e41eb3b3c6592648f6829b9b47a006b9f6b44c2efb16d054d",
+      "model_based_rl.py": "92c66ab15839f906cc2d536c826af373eeca74d00c455b2e04677d1b08bf4a4c",
+      "multi_agent_ppo.py": "f7ff5879818c31296f67ba3d0fdbfc571e6eec6fe8f7484d8609bdbbe51338de",
+      "pinns_heat_eq.py": "28f43aaeebeae2f14fe8f8d3e1dfae190b834fc8505d378a77d7a002f7d2e45b",
+      "requirements-train.txt": "b41f2e839fe661b9c683b2414deda70f3b0e5ca18d47b50365c78ed12fb6b7eb",
+      "requirements.txt": "008aae477b93fa8500d49d498779f57a281300cac940a054afaac44ed31d36e4",
+      "rl_learning/__init__.py": "719edd13c66a1a977ebe1e8566bf011edef2187bd757ac579d86a94a381936cd",
+      "rl_learning/__main__.py": "6ea75fe06dee2727460276ec0f8df51485351afdb64da1688436136baf955cae",
+      "rl_learning/curriculum.py": "0787e9a0101474336fd3be21750ab2f15523f62df79f93d94b0c3243e94064a8",
+      "rl_learning/deep.py": "48309f55a6ad3bb776ab261346d7816c9a26b0c7ff56202330d2918f1049beae",
+      "rl_learning/experiments.py": "adb65fa161aaa01bc8c7e3a2f27d47a936350b6b9a002a6b30320a95f31dd381",
+      "rl_learning/industrial_evaluation.py": "540b40533e2ad874926b7d5b576a54e29e89d4505f71f58ae02097ee3db3ac4e",
+      "rl_learning/reporting.py": "47dc7d3cfa775e5ec89d39b151a7911d3807afd4f1865225147f18e10e66b33d",
+      "rl_learning/tabular.py": "e36af6db3e980b614e85652b48f2340a399486f3fe8403b0c7f769293e21028b",
+      "rl_learning/web.py": "3482258edc49973dd07c82e7136861568436bf423da28408e1ead068ee588c4b",
+      "rl_mpc_hybrid.py": "78ad535b07e53f5e6b54b062cbe0b70a49876e61daa4d60927aa893247282821",
+      "rl_mpc_hybrid_demo.py": "2e6b3cb0f523adba2db778517e76c35d53a55beb028e11ae4a8882954ab441e4",
+      "safe_rl_demo.py": "34c7a81a647f24eb7e5d0ed94f9136ff218485d5c7ba12b27ccaa105b0424b9d",
+      "safe_rl_env.py": "e61199607f2003d4810e2c31e53fa5bd0923e07270f50dfe0f8f1c07b1785b3d",
+      "setup.py": "230a14a2f7497db75eca446f3c5651ccfd6f4c76812dec839cd8db548c715c9b",
+      "simple_demo.py": "5d9d178c5072dff39f70d146a693700e5e1a28e4a583dcbc0a2cd8b334c1a6af",
+      "start.sh": "c7e27c1136df8bb9ae99582de295eec6fd97279c519aad2d00fff2a80e0054f6",
+      "tennessee_eastman_env.py": "8f06d5715d0f47e43dabef0f5d9e0c53d3c7aa1165da89c39d492a449e3f2e53",
+      "tep_evaluator.py": "6181526a2a9f85d6a4c85e7aeba69303600fca08dbb6e06a40920e53f8c0f32d",
+      "tep_optimizer.py": "0f45b04d4b45f43527a344d3622c7ab9cc8be450f748787b3e2f43f129151c84",
+      "test_algorithms.py": "e3392f75fef776e9e0447ef2d05e977f56e55969f84fee8ce76709b4197d4faa",
+      "test_hvac.py": "bffa61840665ba0f085d75d40c6de84d35a037111f44c6caa1842d7c4af4898d",
+      "test_tep_sac.py": "93dea44a7c57ea20ceecf5026228cf35a7f3b0b087d043fd8201110db4d87416",
+      "tests/test_environments.py": "7e77420bcd6ae6f269aa714896a255f24af1abd1203c3880b5fda1709d9b166c",
+      "tests/test_learning.py": "95ebbb1db1667ab0c56aa62d360f390911731dfd718cc1dbddb14a978291bdb6",
+      "tests/test_neural_updates.py": "1a4b9375a6fc767396915bca47a20ac990493a5e59eba10790d3860cd610a23d",
+      "tests/test_tep_evaluation.py": "43cae2f6bc5839b35cebbe315142c649464471996f4ed11639a0b2683082f219",
+      "tests/test_web.py": "55cd3c6d8c1742bbad949459acc06c7fc5a5666ff0da257cdc8c3a49a85356c5"
+    }
+  },
+  "passed": true,
+  "checks": [
+    {
+      "experiment": "dp",
+      "check": "matches_analytic_value",
+      "passed": true
+    },
+    {
+      "experiment": "dp",
+      "check": "vi_pi_agree",
+      "passed": true
+    },
+    {
+      "experiment": "dp",
+      "check": "bellman_residual_small",
+      "passed": true
+    },
+    {
+      "experiment": "prediction",
+      "check": "mc_matches_random_walk_oracle",
+      "passed": true
+    },
+    {
+      "experiment": "prediction",
+      "check": "td_matches_random_walk_oracle",
+      "passed": true
+    },
+    {
+      "experiment": "control",
+      "check": "all_policies_reach_goal",
+      "passed": true
+    },
+    {
+      "experiment": "control",
+      "check": "all_policies_use_shortest_path",
+      "passed": true
+    },
+    {
+      "experiment": "control",
+      "check": "all_policies_beat_random",
+      "passed": true
+    },
+    {
+      "experiment": "planning",
+      "check": "all_policies_reach_goal",
+      "passed": true
+    },
+    {
+      "experiment": "planning",
+      "check": "all_policies_use_shortest_path",
+      "passed": true
+    },
+    {
+      "experiment": "planning",
+      "check": "all_policies_beat_random",
+      "passed": true
+    },
+    {
+      "experiment": "bandit",
+      "check": "all_strategies_prefer_best_arm",
+      "passed": true
+    },
+    {
+      "experiment": "bandit",
+      "check": "regret_below_uniform_expectation",
+      "passed": true
+    },
+    {
+      "experiment": "exploration",
+      "check": "all_policies_reach_goal",
+      "passed": true
+    },
+    {
+      "experiment": "exploration",
+      "check": "all_policies_use_shortest_path",
+      "passed": true
+    },
+    {
+      "experiment": "exploration",
+      "check": "all_policies_beat_random",
+      "passed": true
+    },
+    {
+      "experiment": "ppo",
+      "check": "improves_over_untrained",
+      "passed": true
+    },
+    {
+      "experiment": "ppo",
+      "check": "beats_random_mae",
+      "passed": true
+    },
+    {
+      "experiment": "ppo",
+      "check": "mae_below_one_degree",
+      "passed": true
+    },
+    {
+      "experiment": "ppo",
+      "check": "no_boundary_violations",
+      "passed": true
+    },
+    {
+      "experiment": "dqn",
+      "check": "improves_over_untrained",
+      "passed": true
+    },
+    {
+      "experiment": "dqn",
+      "check": "beats_random_mae",
+      "passed": true
+    },
+    {
+      "experiment": "dqn",
+      "check": "mae_below_one_degree",
+      "passed": true
+    },
+    {
+      "experiment": "dqn",
+      "check": "no_boundary_violations",
+      "passed": true
+    },
+    {
+      "experiment": "a2c",
+      "check": "improves_over_untrained",
+      "passed": true
+    },
+    {
+      "experiment": "a2c",
+      "check": "beats_random_mae",
+      "passed": true
+    },
+    {
+      "experiment": "a2c",
+      "check": "mae_below_one_degree",
+      "passed": true
+    },
+    {
+      "experiment": "a2c",
+      "check": "no_boundary_violations",
+      "passed": true
+    },
+    {
+      "experiment": "reinforce",
+      "check": "improves_over_untrained",
+      "passed": true
+    },
+    {
+      "experiment": "reinforce",
+      "check": "beats_random_mae",
+      "passed": true
+    },
+    {
+      "experiment": "reinforce",
+      "check": "mae_below_one_degree",
+      "passed": true
+    },
+    {
+      "experiment": "reinforce",
+      "check": "no_boundary_violations",
+      "passed": true
+    }
+  ],
+  "experiments": [
+    {
+      "lab": "dp",
+      "metrics": {
+        "vi_start_value": -5.298162187499999,
+        "pi_start_value": -5.298162187499999,
+        "analytic_start_value": -5.298162187499999,
+        "bellman_residual": 0.0,
+        "value_iterations": 7,
+        "policy_iterations": 5,
+        "vi_policy": [
+          1,
+          1,
+          1,
+          2,
+          1,
+          1,
+          1,
+          2,
+          1,
+          1,
+          1,
+          2,
+          1,
+          1,
+          1,
+          0
+        ],
+        "pi_policy": [
+          1,
+          1,
+          1,
+          2,
+          1,
+          1,
+          1,
+          2,
+          1,
+          1,
+          1,
+          2,
+          1,
+          1,
+          1,
+          0
+        ]
+      },
+      "checks": {
+        "matches_analytic_value": true,
+        "vi_pi_agree": true,
+        "bellman_residual_small": true
+      },
+      "runs": []
+    },
+    {
+      "lab": "prediction",
+      "checks": {
+        "mc_matches_random_walk_oracle": true,
+        "td_matches_random_walk_oracle": true
+      },
+      "runs": [
+        {
+          "seed": 0,
+          "truth": [
+            0.16666666666666666,
+            0.3333333333333333,
+            0.5,
+            0.6666666666666666,
+            0.8333333333333334
+          ],
+          "mc_values": [
+            0.17141292442497283,
+            0.3275555555555549,
+            0.4956666666666672,
+            0.6698198198198192,
+            0.8335201793721965
+          ],
+          "td_values": [
+            0.1265062077953683,
+            0.292213327798671,
+            0.4384589376366404,
+            0.6313229443636551,
+            0.7892943748621379
+          ],
+          "mc_rmse": 0.004114966410189026,
+          "td_rmse": 0.04534231630209223
+        },
+        {
+          "seed": 1,
+          "truth": [
+            0.16666666666666666,
+            0.3333333333333333,
+            0.5,
+            0.6666666666666666,
+            0.8333333333333334
+          ],
+          "mc_values": [
+            0.15197740112994368,
+            0.32690582959641246,
+            0.4996666666666668,
+            0.6767494356659136,
+            0.842134831460674
+          ],
+          "td_values": [
+            0.14709672559819953,
+            0.320428575018492,
+            0.5199595831851187,
+            0.7427951029221675,
+            0.855440654274942
+          ],
+          "mc_rmse": 0.00934159555306648,
+          "td_rmse": 0.0380320201604768
+        },
+        {
+          "seed": 2,
+          "truth": [
+            0.16666666666666666,
+            0.3333333333333333,
+            0.5,
+            0.6666666666666666,
+            0.8333333333333334
+          ],
+          "mc_values": [
+            0.16757940854326395,
+            0.32653965440850713,
+            0.4933333333333327,
+            0.6654676258992812,
+            0.8323959505061866
+          ],
+          "td_values": [
+            0.1325616580708643,
+            0.31006252308887033,
+            0.4438860471208503,
+            0.609419563731369,
+            0.8677886468141335
+          ],
+          "mc_rmse": 0.004330080850003999,
+          "td_rmse": 0.043169103187399575
+        }
+      ]
+    },
+    {
+      "lab": "control",
+      "checks": {
+        "all_policies_reach_goal": true,
+        "all_policies_use_shortest_path": true,
+        "all_policies_beat_random": true
+      },
+      "interpretation": "曲线用于比较样本效率与计数奖励；不预设 Dyna 或内在奖励总能改善结果。",
+      "runs": [
+        {
+          "seed": 0,
+          "algorithm": "q_learning",
+          "evaluation": {
+            "return_mean": -6.0,
+            "steps_mean": 6.0,
+            "success_rate": 1.0
+          },
+          "random_baseline": {
+            "return_mean": -45.84,
+            "steps_mean": 45.84,
+            "success_rate": 0.85
+          },
+          "visited_pairs": 60,
+          "real_steps": 4724,
+          "planning_updates": 0
+        },
+        {
+          "seed": 0,
+          "algorithm": "sarsa",
+          "evaluation": {
+            "return_mean": -6.0,
+            "steps_mean": 6.0,
+            "success_rate": 1.0
+          },
+          "random_baseline": {
+            "return_mean": -45.84,
+            "steps_mean": 45.84,
+            "success_rate": 0.85
+          },
+          "visited_pairs": 60,
+          "real_steps": 4773,
+          "planning_updates": 0
+        },
+        {
+          "seed": 1,
+          "algorithm": "q_learning",
+          "evaluation": {
+            "return_mean": -6.0,
+            "steps_mean": 6.0,
+            "success_rate": 1.0
+          },
+          "random_baseline": {
+            "return_mean": -55.35,
+            "steps_mean": 55.35,
+            "success_rate": 0.83
+          },
+          "visited_pairs": 60,
+          "real_steps": 4725,
+          "planning_updates": 0
+        },
+        {
+          "seed": 1,
+          "algorithm": "sarsa",
+          "evaluation": {
+            "return_mean": -6.0,
+            "steps_mean": 6.0,
+            "success_rate": 1.0
+          },
+          "random_baseline": {
+            "return_mean": -55.35,
+            "steps_mean": 55.35,
+            "success_rate": 0.83
+          },
+          "visited_pairs": 60,
+          "real_steps": 4764,
+          "planning_updates": 0
+        },
+        {
+          "seed": 2,
+          "algorithm": "q_learning",
+          "evaluation": {
+            "return_mean": -6.0,
+            "steps_mean": 6.0,
+            "success_rate": 1.0
+          },
+          "random_baseline": {
+            "return_mean": -52.4,
+            "steps_mean": 52.4,
+            "success_rate": 0.85
+          },
+          "visited_pairs": 60,
+          "real_steps": 4767,
+          "planning_updates": 0
+        },
+        {
+          "seed": 2,
+          "algorithm": "sarsa",
+          "evaluation": {
+            "return_mean": -6.0,
+            "steps_mean": 6.0,
+            "success_rate": 1.0
+          },
+          "random_baseline": {
+            "return_mean": -52.4,
+            "steps_mean": 52.4,
+            "success_rate": 0.85
+          },
+          "visited_pairs": 60,
+          "real_steps": 4830,
+          "planning_updates": 0
+        }
+      ]
+    },
+    {
+      "lab": "planning",
+      "checks": {
+        "all_policies_reach_goal": true,
+        "all_policies_use_shortest_path": true,
+        "all_policies_beat_random": true
+      },
+      "interpretation": "曲线用于比较样本效率与计数奖励；不预设 Dyna 或内在奖励总能改善结果。",
+      "runs": [
+        {
+          "seed": 0,
+          "algorithm": "q_learning",
+          "evaluation": {
+            "return_mean": -6.0,
+            "steps_mean": 6.0,
+            "success_rate": 1.0
+          },
+          "random_baseline": {
+            "return_mean": -45.84,
+            "steps_mean": 45.84,
+            "success_rate": 0.85
+          },
+          "visited_pairs": 60,
+          "real_steps": 3000,
+          "planning_updates": 0
+        },
+        {
+          "seed": 0,
+          "algorithm": "dyna_q",
+          "evaluation": {
+            "return_mean": -6.0,
+            "steps_mean": 6.0,
+            "success_rate": 1.0
+          },
+          "random_baseline": {
+            "return_mean": -45.84,
+            "steps_mean": 45.84,
+            "success_rate": 0.85
+          },
+          "visited_pairs": 60,
+          "real_steps": 3000,
+          "planning_updates": 15000
+        },
+        {
+          "seed": 1,
+          "algorithm": "q_learning",
+          "evaluation": {
+            "return_mean": -6.0,
+            "steps_mean": 6.0,
+            "success_rate": 1.0
+          },
+          "random_baseline": {
+            "return_mean": -55.35,
+            "steps_mean": 55.35,
+            "success_rate": 0.83
+          },
+          "visited_pairs": 60,
+          "real_steps": 3000,
+          "planning_updates": 0
+        },
+        {
+          "seed": 1,
+          "algorithm": "dyna_q",
+          "evaluation": {
+            "return_mean": -6.0,
+            "steps_mean": 6.0,
+            "success_rate": 1.0
+          },
+          "random_baseline": {
+            "return_mean": -55.35,
+            "steps_mean": 55.35,
+            "success_rate": 0.83
+          },
+          "visited_pairs": 60,
+          "real_steps": 3000,
+          "planning_updates": 15000
+        },
+        {
+          "seed": 2,
+          "algorithm": "q_learning",
+          "evaluation": {
+            "return_mean": -6.0,
+            "steps_mean": 6.0,
+            "success_rate": 1.0
+          },
+          "random_baseline": {
+            "return_mean": -52.4,
+            "steps_mean": 52.4,
+            "success_rate": 0.85
+          },
+          "visited_pairs": 60,
+          "real_steps": 3000,
+          "planning_updates": 0
+        },
+        {
+          "seed": 2,
+          "algorithm": "dyna_q",
+          "evaluation": {
+            "return_mean": -6.0,
+            "steps_mean": 6.0,
+            "success_rate": 1.0
+          },
+          "random_baseline": {
+            "return_mean": -52.4,
+            "steps_mean": 52.4,
+            "success_rate": 0.85
+          },
+          "visited_pairs": 60,
+          "real_steps": 3000,
+          "planning_updates": 15000
+        }
+      ]
+    },
+    {
+      "lab": "bandit",
+      "checks": {
+        "all_strategies_prefer_best_arm": true,
+        "regret_below_uniform_expectation": true
+      },
+      "runs": [
+        {
+          "seed": 0,
+          "strategy": "epsilon_greedy",
+          "pseudo_regret": 157.99999999999997,
+          "optimal_action_rate": 0.878,
+          "counts": [
+            76,
+            89,
+            2634,
+            201
+          ]
+        },
+        {
+          "seed": 0,
+          "strategy": "ucb",
+          "pseudo_regret": 80.49999999999982,
+          "optimal_action_rate": 0.931,
+          "counts": [
+            23,
+            46,
+            2793,
+            138
+          ]
+        },
+        {
+          "seed": 0,
+          "strategy": "thompson",
+          "pseudo_regret": 15.400000000000004,
+          "optimal_action_rate": 0.988,
+          "counts": [
+            7,
+            9,
+            2964,
+            20
+          ]
+        },
+        {
+          "seed": 1,
+          "strategy": "epsilon_greedy",
+          "pseudo_regret": 123.60000000000005,
+          "optimal_action_rate": 0.9206666666666666,
+          "counts": [
+            89,
+            83,
+            2762,
+            66
+          ]
+        },
+        {
+          "seed": 1,
+          "strategy": "ucb",
+          "pseudo_regret": 97.5999999999998,
+          "optimal_action_rate": 0.922,
+          "counts": [
+            34,
+            69,
+            2766,
+            131
+          ]
+        },
+        {
+          "seed": 1,
+          "strategy": "thompson",
+          "pseudo_regret": 15.499999999999995,
+          "optimal_action_rate": 0.989,
+          "counts": [
+            9,
+            10,
+            2967,
+            14
+          ]
+        },
+        {
+          "seed": 2,
+          "strategy": "epsilon_greedy",
+          "pseudo_regret": 121.5,
+          "optimal_action_rate": 0.9156666666666666,
+          "counts": [
+            66,
+            96,
+            2747,
+            91
+          ]
+        },
+        {
+          "seed": 2,
+          "strategy": "ucb",
+          "pseudo_regret": 80.99999999999989,
+          "optimal_action_rate": 0.9353333333333333,
+          "counts": [
+            32,
+            50,
+            2806,
+            112
+          ]
+        },
+        {
+          "seed": 2,
+          "strategy": "thompson",
+          "pseudo_regret": 19.70000000000001,
+          "optimal_action_rate": 0.983,
+          "counts": [
+            5,
+            12,
+            2949,
+            34
+          ]
+        }
+      ]
+    },
+    {
+      "lab": "exploration",
+      "checks": {
+        "all_policies_reach_goal": true,
+        "all_policies_use_shortest_path": true,
+        "all_policies_beat_random": true
+      },
+      "interpretation": "曲线用于比较样本效率与计数奖励；不预设 Dyna 或内在奖励总能改善结果。",
+      "runs": [
+        {
+          "seed": 0,
+          "algorithm": "no_bonus",
+          "evaluation": {
+            "return_mean": -6.0,
+            "steps_mean": 6.0,
+            "success_rate": 1.0
+          },
+          "random_baseline": {
+            "return_mean": -45.84,
+            "steps_mean": 45.84,
+            "success_rate": 0.85
+          },
+          "visited_pairs": 60,
+          "real_steps": 3000,
+          "planning_updates": 0
+        },
+        {
+          "seed": 0,
+          "algorithm": "count_bonus",
+          "evaluation": {
+            "return_mean": -6.0,
+            "steps_mean": 6.0,
+            "success_rate": 1.0
+          },
+          "random_baseline": {
+            "return_mean": -45.84,
+            "steps_mean": 45.84,
+            "success_rate": 0.85
+          },
+          "visited_pairs": 60,
+          "real_steps": 3000,
+          "planning_updates": 0
+        },
+        {
+          "seed": 1,
+          "algorithm": "no_bonus",
+          "evaluation": {
+            "return_mean": -6.0,
+            "steps_mean": 6.0,
+            "success_rate": 1.0
+          },
+          "random_baseline": {
+            "return_mean": -55.35,
+            "steps_mean": 55.35,
+            "success_rate": 0.83
+          },
+          "visited_pairs": 60,
+          "real_steps": 3000,
+          "planning_updates": 0
+        },
+        {
+          "seed": 1,
+          "algorithm": "count_bonus",
+          "evaluation": {
+            "return_mean": -6.0,
+            "steps_mean": 6.0,
+            "success_rate": 1.0
+          },
+          "random_baseline": {
+            "return_mean": -55.35,
+            "steps_mean": 55.35,
+            "success_rate": 0.83
+          },
+          "visited_pairs": 60,
+          "real_steps": 3000,
+          "planning_updates": 0
+        },
+        {
+          "seed": 2,
+          "algorithm": "no_bonus",
+          "evaluation": {
+            "return_mean": -6.0,
+            "steps_mean": 6.0,
+            "success_rate": 1.0
+          },
+          "random_baseline": {
+            "return_mean": -52.4,
+            "steps_mean": 52.4,
+            "success_rate": 0.85
+          },
+          "visited_pairs": 60,
+          "real_steps": 3000,
+          "planning_updates": 0
+        },
+        {
+          "seed": 2,
+          "algorithm": "count_bonus",
+          "evaluation": {
+            "return_mean": -6.0,
+            "steps_mean": 6.0,
+            "success_rate": 1.0
+          },
+          "random_baseline": {
+            "return_mean": -52.4,
+            "steps_mean": 52.4,
+            "success_rate": 0.85
+          },
+          "visited_pairs": 60,
+          "real_steps": 3000,
+          "planning_updates": 0
+        }
+      ]
+    },
+    {
+      "lab": "deep",
+      "algorithm": "ppo",
+      "eval_seeds": [
+        20000,
+        20001,
+        20002,
+        20003,
+        20004,
+        20005,
+        20006,
+        20007,
+        20008,
+        20009,
+        20010,
+        20011,
+        20012,
+        20013,
+        20014,
+        20015,
+        20016,
+        20017,
+        20018,
+        20019
+      ],
+      "config": {
+        "requested_timesteps": 40000,
+        "eval_episodes": 20,
+        "eval_seed_base": 20000,
+        "reinforce_trajectories_per_update": null,
+        "gamma": 0.95,
+        "reward_scale": 0.1,
+        "observation_center": 25.0,
+        "policy_network": [
+          32,
+          32
+        ],
+        "torch_threads": 1,
+        "learning_rate": 0.0005,
+        "algorithm_parameters": {
+          "n_steps": 256,
+          "batch_size": 64,
+          "n_epochs": 10,
+          "ent_coef": 0.01
+        }
+      },
+      "baselines": {
+        "random": {
+          "return_mean": -490.1236108976338,
+          "return_std": 767.8686462150121,
+          "mae_mean": 3.175618054488169,
+          "comfort_rate": 0.091,
+          "violations": 342
+        },
+        "rule": {
+          "return_mean": 975.3932579927889,
+          "return_std": 10.783761382455285,
+          "mae_mean": 0.12303371003605539,
+          "comfort_rate": 0.9630000000000001,
+          "violations": 0
+        }
+      },
+      "metrics": {
+        "before_mae_mean": 5.524821649086973,
+        "after_mae_mean": 0.13725347438259386,
+        "after_mae_std_across_training_seeds": 0.015217628204038517,
+        "rule_mae_mean": 0.12303371003605539
+      },
+      "checks": {
+        "improves_over_untrained": true,
+        "beats_random_mae": true,
+        "mae_below_one_degree": true,
+        "no_boundary_violations": true
+      },
+      "interpretation": "规则基线是独立参照，不要求 RL 必须胜过它。仅验证该简化温控模型，不验证 HVAC/TEP 或真实设备。",
+      "runs": [
+        {
+          "seed": 0,
+          "actual_timesteps": 40192,
+          "before": {
+            "return_mean": -3879.0317115378684,
+            "return_std": 641.7349236332243,
+            "mae_mean": 4.432658557689342,
+            "comfort_rate": 0.029500000000000005,
+            "violations": 1597
+          },
+          "after": {
+            "return_mean": 968.25584074568,
+            "return_std": 15.981957607968642,
+            "mae_mean": 0.15872079627159938,
+            "comfort_rate": 0.9334999999999999,
+            "violations": 0
+          }
+        },
+        {
+          "seed": 1,
+          "actual_timesteps": 40192,
+          "before": {
+            "return_mean": -3294.1806389571575,
+            "return_std": 469.5730099314717,
+            "mae_mean": 6.070903194785788,
+            "comfort_rate": 0.002,
+            "violations": 1232
+          },
+          "after": {
+            "return_mean": 974.9590871494765,
+            "return_std": 10.643672464014161,
+            "mae_mean": 0.12520456425261667,
+            "comfort_rate": 0.9630000000000001,
+            "violations": 0
+          }
+        },
+        {
+          "seed": 2,
+          "actual_timesteps": 40192,
+          "before": {
+            "return_mean": -3294.1806389571575,
+            "return_std": 469.5730099314717,
+            "mae_mean": 6.070903194785788,
+            "comfort_rate": 0.002,
+            "violations": 1232
+          },
+          "after": {
+            "return_mean": 974.4329874752868,
+            "return_std": 10.718394283429614,
+            "mae_mean": 0.12783506262356553,
+            "comfort_rate": 0.9574999999999999,
+            "violations": 0
+          }
+        }
+      ]
+    },
+    {
+      "lab": "deep",
+      "algorithm": "dqn",
+      "eval_seeds": [
+        20000,
+        20001,
+        20002,
+        20003,
+        20004,
+        20005,
+        20006,
+        20007,
+        20008,
+        20009,
+        20010,
+        20011,
+        20012,
+        20013,
+        20014,
+        20015,
+        20016,
+        20017,
+        20018,
+        20019
+      ],
+      "config": {
+        "requested_timesteps": 40000,
+        "eval_episodes": 20,
+        "eval_seed_base": 20000,
+        "reinforce_trajectories_per_update": null,
+        "gamma": 0.95,
+        "reward_scale": 0.1,
+        "observation_center": 25.0,
+        "policy_network": [
+          32,
+          32
+        ],
+        "torch_threads": 1,
+        "learning_rate": 0.0005,
+        "algorithm_parameters": {
+          "buffer_size": 20000,
+          "learning_starts": 500,
+          "batch_size": 64,
+          "train_freq": 4,
+          "target_update_interval": 500,
+          "exploration_fraction": 0.5
+        }
+      },
+      "baselines": {
+        "random": {
+          "return_mean": -490.1236108976338,
+          "return_std": 767.8686462150121,
+          "mae_mean": 3.175618054488169,
+          "comfort_rate": 0.091,
+          "violations": 342
+        },
+        "rule": {
+          "return_mean": 975.3932579927889,
+          "return_std": 10.783761382455285,
+          "mae_mean": 0.12303371003605539,
+          "comfort_rate": 0.9630000000000001,
+          "violations": 0
+        }
+      },
+      "metrics": {
+        "before_mae_mean": 4.352178155443149,
+        "after_mae_mean": 0.14733155342745943,
+        "after_mae_std_across_training_seeds": 0.015550646224493857,
+        "rule_mae_mean": 0.12303371003605539
+      },
+      "checks": {
+        "improves_over_untrained": true,
+        "beats_random_mae": true,
+        "mae_below_one_degree": true,
+        "no_boundary_violations": true
+      },
+      "interpretation": "规则基线是独立参照，不要求 RL 必须胜过它。仅验证该简化温控模型，不验证 HVAC/TEP 或真实设备。",
+      "runs": [
+        {
+          "seed": 0,
+          "actual_timesteps": 40000,
+          "before": {
+            "return_mean": -2361.429427726061,
+            "return_std": 960.0475312974858,
+            "mae_mean": 3.819647138630306,
+            "comfort_rate": 0.0445,
+            "violations": 1039
+          },
+          "after": {
+            "return_mean": 973.5973231240748,
+            "return_std": 10.899842141258606,
+            "mae_mean": 0.13201338437962556,
+            "comfort_rate": 0.962,
+            "violations": 0
+          }
+        },
+        {
+          "seed": 1,
+          "actual_timesteps": 40000,
+          "before": {
+            "return_mean": -4138.688732769914,
+            "return_std": 320.3609234254857,
+            "mae_mean": 4.61844366384957,
+            "comfort_rate": 0.014500000000000002,
+            "violations": 1686
+          },
+          "after": {
+            "return_mean": 971.7349964081234,
+            "return_std": 10.784278955140358,
+            "mae_mean": 0.14132501795938418,
+            "comfort_rate": 0.9630000000000001,
+            "violations": 0
+          }
+        },
+        {
+          "seed": 2,
+          "actual_timesteps": 40000,
+          "before": {
+            "return_mean": -4138.688732769914,
+            "return_std": 320.3609234254857,
+            "mae_mean": 4.61844366384957,
+            "comfort_rate": 0.014500000000000002,
+            "violations": 1686
+          },
+          "after": {
+            "return_mean": 966.2687484113263,
+            "return_std": 16.0904146359097,
+            "mae_mean": 0.16865625794336853,
+            "comfort_rate": 0.9334999999999999,
+            "violations": 0
+          }
+        }
+      ]
+    },
+    {
+      "lab": "deep",
+      "algorithm": "a2c",
+      "eval_seeds": [
+        20000,
+        20001,
+        20002,
+        20003,
+        20004,
+        20005,
+        20006,
+        20007,
+        20008,
+        20009,
+        20010,
+        20011,
+        20012,
+        20013,
+        20014,
+        20015,
+        20016,
+        20017,
+        20018,
+        20019
+      ],
+      "config": {
+        "requested_timesteps": 40000,
+        "eval_episodes": 20,
+        "eval_seed_base": 20000,
+        "reinforce_trajectories_per_update": null,
+        "gamma": 0.95,
+        "reward_scale": 0.1,
+        "observation_center": 25.0,
+        "policy_network": [
+          32,
+          32
+        ],
+        "torch_threads": 1,
+        "learning_rate": 0.0005,
+        "algorithm_parameters": {
+          "n_steps": 32,
+          "ent_coef": 0.01
+        }
+      },
+      "baselines": {
+        "random": {
+          "return_mean": -490.1236108976338,
+          "return_std": 767.8686462150121,
+          "mae_mean": 3.175618054488169,
+          "comfort_rate": 0.091,
+          "violations": 342
+        },
+        "rule": {
+          "return_mean": 975.3932579927889,
+          "return_std": 10.783761382455285,
+          "mae_mean": 0.12303371003605539,
+          "comfort_rate": 0.9630000000000001,
+          "violations": 0
+        }
+      },
+      "metrics": {
+        "before_mae_mean": 5.524821649086973,
+        "after_mae_mean": 0.18188615978065073,
+        "after_mae_std_across_training_seeds": 0.004673204979179691,
+        "rule_mae_mean": 0.12303371003605539
+      },
+      "checks": {
+        "improves_over_untrained": true,
+        "beats_random_mae": true,
+        "mae_below_one_degree": true,
+        "no_boundary_violations": true
+      },
+      "interpretation": "规则基线是独立参照，不要求 RL 必须胜过它。仅验证该简化温控模型，不验证 HVAC/TEP 或真实设备。",
+      "runs": [
+        {
+          "seed": 0,
+          "actual_timesteps": 40000,
+          "before": {
+            "return_mean": -3879.0317115378684,
+            "return_std": 641.7349236332243,
+            "mae_mean": 4.432658557689342,
+            "comfort_rate": 0.029500000000000005,
+            "violations": 1597
+          },
+          "after": {
+            "return_mean": 964.3981547393196,
+            "return_std": 10.265863925639428,
+            "mae_mean": 0.1780092263034015,
+            "comfort_rate": 0.9630000000000001,
+            "violations": 0
+          }
+        },
+        {
+          "seed": 1,
+          "actual_timesteps": 40000,
+          "before": {
+            "return_mean": -3294.1806389571575,
+            "return_std": 469.5730099314717,
+            "mae_mean": 6.070903194785788,
+            "comfort_rate": 0.002,
+            "violations": 1232
+          },
+          "after": {
+            "return_mean": 964.1621196201024,
+            "return_std": 10.378026464091562,
+            "mae_mean": 0.179189401899488,
+            "comfort_rate": 0.9630000000000001,
+            "violations": 0
+          }
+        },
+        {
+          "seed": 2,
+          "actual_timesteps": 40000,
+          "before": {
+            "return_mean": -3294.1806389571575,
+            "return_std": 469.5730099314717,
+            "mae_mean": 6.070903194785788,
+            "comfort_rate": 0.002,
+            "violations": 1232
+          },
+          "after": {
+            "return_mean": 962.3080297721874,
+            "return_std": 10.138402230302534,
+            "mae_mean": 0.18845985113906272,
+            "comfort_rate": 0.9630000000000001,
+            "violations": 0
+          }
+        }
+      ]
+    },
+    {
+      "lab": "deep",
+      "algorithm": "reinforce",
+      "eval_seeds": [
+        20000,
+        20001,
+        20002,
+        20003,
+        20004,
+        20005,
+        20006,
+        20007,
+        20008,
+        20009,
+        20010,
+        20011,
+        20012,
+        20013,
+        20014,
+        20015,
+        20016,
+        20017,
+        20018,
+        20019
+      ],
+      "config": {
+        "requested_timesteps": 40000,
+        "eval_episodes": 20,
+        "eval_seed_base": 20000,
+        "reinforce_trajectories_per_update": 2,
+        "gamma": 0.95,
+        "reward_scale": 0.1,
+        "observation_center": 25.0,
+        "policy_network": [
+          32,
+          32
+        ],
+        "torch_threads": 1,
+        "learning_rate": 0.003,
+        "algorithm_parameters": {
+          "trajectories_per_update": 2,
+          "baseline": "leave_one_trajectory_out"
+        }
+      },
+      "baselines": {
+        "random": {
+          "return_mean": -490.1236108976338,
+          "return_std": 767.8686462150121,
+          "mae_mean": 3.175618054488169,
+          "comfort_rate": 0.091,
+          "violations": 342
+        },
+        "rule": {
+          "return_mean": 975.3932579927889,
+          "return_std": 10.783761382455285,
+          "mae_mean": 0.12303371003605539,
+          "comfort_rate": 0.9630000000000001,
+          "violations": 0
+        }
+      },
+      "metrics": {
+        "before_mae_mean": 6.146379731420507,
+        "after_mae_mean": 0.2422969752359393,
+        "after_mae_std_across_training_seeds": 0.06146188766460913,
+        "rule_mae_mean": 0.12303371003605539
+      },
+      "checks": {
+        "improves_over_untrained": true,
+        "beats_random_mae": true,
+        "mae_below_one_degree": true,
+        "no_boundary_violations": true
+      },
+      "interpretation": "规则基线是独立参照，不要求 RL 必须胜过它。仅验证该简化温控模型，不验证 HVAC/TEP 或真实设备。",
+      "runs": [
+        {
+          "seed": 0,
+          "actual_timesteps": 40000,
+          "before": {
+            "return_mean": -2361.429427726061,
+            "return_std": 960.0475312974858,
+            "mae_mean": 3.819647138630306,
+            "comfort_rate": 0.0445,
+            "violations": 1039
+          },
+          "after": {
+            "return_mean": 964.3835663354093,
+            "return_std": 9.967272811285195,
+            "mae_mean": 0.17808216832295298,
+            "comfort_rate": 0.9630000000000001,
+            "violations": 0
+          }
+        },
+        {
+          "seed": 1,
+          "actual_timesteps": 40000,
+          "before": {
+            "return_mean": -428.1091654649975,
+            "return_std": 135.101420378686,
+            "mae_mean": 7.140545827324987,
+            "comfort_rate": 0.026500000000000003,
+            "violations": 0
+          },
+          "after": {
+            "return_mean": 934.9728158041651,
+            "return_std": 14.625267012731603,
+            "mae_mean": 0.32513592097917415,
+            "comfort_rate": 0.9334999999999999,
+            "violations": 0
+          }
+        },
+        {
+          "seed": 2,
+          "actual_timesteps": 40000,
+          "before": {
+            "return_mean": -2980.7892456612453,
+            "return_std": 560.125434929005,
+            "mae_mean": 7.478946228306228,
+            "comfort_rate": 0.026500000000000003,
+            "violations": 994
+          },
+          "after": {
+            "return_mean": 955.2654327188617,
+            "return_std": 10.690951235239593,
+            "mae_mean": 0.22367283640569072,
+            "comfort_rate": 0.9630000000000001,
+            "violations": 0
+          }
+        }
+      ]
+    }
+  ],
+  "limitations": [
+    "小型实验与简化温控的通过不能证明真实工业安全性。",
+    "L9 不确定性、TRPO、MCTS、RND/NGU 等尚无自动验收；参见课程覆盖表。",
+    "统计检查针对所列种子与预算，不构成算法的一般性能保证。"
+  ]
+}

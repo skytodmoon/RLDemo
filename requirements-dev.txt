@@ -1,0 +1,2 @@
+-r requirements-train.txt
+pytest>=8,<10
